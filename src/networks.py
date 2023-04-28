@@ -54,8 +54,8 @@ class SimpleNet(nn.Module):
     def forward(self, x, h0):
         x = self.input_encoder(x)
         x = self.input_activation(x)
-        x, h = self.motor_cortex(x, h0)
-        x = self.readout_layer(x)
-        return x
+        h, _ = self.motor_cortex(x, h0)
+        x = self.readout_layer(h)
+        return x, h
 
 
