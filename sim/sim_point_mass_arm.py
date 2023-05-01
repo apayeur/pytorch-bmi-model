@@ -42,14 +42,14 @@ def plot_trajectories(net, dataset, network_size, outfile_name):
     fig, ax = plt.subplots(ncols=1, figsize=(45*units_convert['mm'], 45*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _ = net(dataset[i][0], NOISE_FOR_HIDDEN_INIT * torch.rand((1, network_size[2])))
+        pred, _ = net(dataset[i][0].unsqueeze(0), NOISE_FOR_HIDDEN_INIT * torch.rand((1, 1, network_size[2])))
         pred = pred.detach().numpy()
-        pred_traj = pred[:, :2]
+        pred_traj = pred[0, :, :2]
         target = dataset[i][1].detach().numpy()
 
         # plot trajectories
         ax.plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
-        ax.plot(target[0], target[1], '--', color=colors[i], marker='o', markersize=3, lw=0.)
+        ax.plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
     ax.axis('off')
     ax.set_aspect('equal', 'box')
     ax.set_xticks([])
@@ -114,7 +114,7 @@ dataloader = DataLoader(dataset, batch_size=args.n_targets)
 loss_fn = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters(), lr=3e-4)
 
-epochs = 1500
+epochs = 1000
 for t in range(epochs):
     for X, y in dataloader:
         # Compute prediction and loss
