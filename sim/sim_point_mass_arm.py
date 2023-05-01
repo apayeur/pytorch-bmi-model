@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import sys
 sys.path.append("../src")
-from datasets import GaussianVelocityDataset
+from datasets import EndLossDataset
+from effectors import PointMassArm
 from networks import SimpleNet
 import numpy as np
 import argparse
@@ -13,12 +14,18 @@ from seaborn import color_palette, despine
 from plot_utils import units_convert
 plt.style.use('../plot_params.dms')
 
+"""
+Description:
+-----------
+Simulation of the center-out BCI task using a point-mass arm to establish the inductive bias.
+Workspace dimension is 2. 
+"""
+
 
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("-n_targets", type=int, help="number of targets", default=8)
 parser.add_argument("-n_readouts", type=int, help="number of readout units", default=12)
-parser.add_argument("-workspace_dim", type=int, help="dimension of workspace, 2 or 3", default=2)
 parser.add_argument("-dt", type=float, help="integration time step", default=0.01)
 parser.add_argument("-sigma", type=float, help="time spread of target velocity profile", default=0.1)
 parser.add_argument("-total_duration", type=float, help="total duration of the reach, including holding times", default=1.5)
@@ -37,13 +44,12 @@ def plot_trajectories(net, dataset, network_size, outfile_name):
     for i in range(dataset.n_targets):
         pred, _ = net(dataset[i][0], NOISE_FOR_HIDDEN_INIT * torch.rand((1, network_size[2])))
         pred = pred.detach().numpy()
-        pred_traj = pred[:, :args.workspace_dim]
+        pred_traj = pred[:, :2]
         target = dataset[i][1].detach().numpy()
-        target_traj = target[]
 
         # plot trajectories
         ax.plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
-        ax.plot(target_traj[:, 0], target_traj[:, 1], '--', color=colors[i], lw=0.5)
+        ax.plot(target[0], target[1], '--', color=colors[i], marker='o', markersize=3, lw=0.)
     ax.axis('off')
     ax.set_aspect('equal', 'box')
     ax.set_xticks([])
@@ -52,14 +58,16 @@ def plot_trajectories(net, dataset, network_size, outfile_name):
 
 
 def build_bci_decoder(net, dataloader, network_size, n_readouts=10, clda=0.):
+    assert clda > 0., "CLDA not yet implemented"
     with torch.no_grad():
         for X, y in dataloader:
             h0 = NOISE_FOR_HIDDEN_INIT * torch.rand(
                 (1, 8, network_size[2]))  # set of initial conditions for motor cortex
             pred, h = net(X, h0)
             if clda > 0.:
-                pred = y
+                pass
     h = torch.reshape(h, (-1, h.size(2)))
+    pred = pred[:, :, 2:4]  # only using the velocities
     pred = torch.reshape(pred, (-1, pred.size(2)))
 
     # perform regression
@@ -82,17 +90,25 @@ torch.manual_seed(SEED)
 network_size = args.size
 net = SimpleNet(network_size=network_size, nonlinearity='relu')
 
+# Use point-mass arm as effector
+pma = PointMassArm()
+net.effector = pma
+
 # Parameters
 NOISE_FOR_HIDDEN_INIT = args.noisy_ics
 CLDA_FREQUENCY = 20     # frequency with which to perform CLDA, in number of epochs
 CLDA_START = 0          # epoch ID to start CLDA at
 CLDA = 0.0              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
+NON_DIMENSIONALIZERs = torch.Tensor([[[0.01, 0.01, 0.02, 0.02, 0.08, 0.08]]])  # to rescale velocity and acceleration components of loss
+GAMMA_v = 0.25
+GAMMA_f = 0.05
+HYPERPARAMS = torch.Tensor([[[1., 1., GAMMA_v**0.5, GAMMA_v**0.5, GAMMA_f**0.5, GAMMA_f**0.5]]])
 N_READOUTS = args.n_readouts
 
 # (1) TRAIN FOR MANUAL CONTROL
-dataset = GaussianVelocityDataset(n_targets=args.n_targets, total_duration=args.total_duration, dt=args.dt,
-                                  distance=0.07, hold_start=args.hold_start, hold_end=args.hold_end, sigma=args.sigma,
-                                  context='arm')
+dataset = EndLossDataset(n_targets=args.n_targets, total_duration=args.total_duration, dt=args.dt,
+                         distance=0.07, hold_start=args.hold_start, hold_end=args.hold_end, sigma=args.sigma,
+                         context='arm')
 dataloader = DataLoader(dataset, batch_size=args.n_targets)
 
 loss_fn = torch.nn.MSELoss()
@@ -104,7 +120,7 @@ for t in range(epochs):
         # Compute prediction and loss
         h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
         pred, _ = net(X, h0)
-        loss = loss_fn(pred, y)
+        loss = loss_fn(pred[:, -1, :]/NON_DIMENSIONALIZERs * HYPERPARAMS, y/NON_DIMENSIONALIZERs * HYPERPARAMS)
 
         # Backpropagation
         optimizer.zero_grad()
@@ -114,10 +130,10 @@ for t in range(epochs):
         if t % 100 == 0:
             print(f"Epoch {t}: loss = {loss.item():>10e}")
 
-plot_trajectories(net, dataset, network_size, "ManualControlTrajectories.png")
+plot_trajectories(net, dataset, network_size, "ManualControlTrajectoriesPMA.png")
 plt.show()
 
-
+"""
 # (2) BUILD BCI DECODER
 D = build_bci_decoder(net, dataloader, network_size, n_readouts=N_READOUTS)
 net.readout_layer.weight.data = torch.from_numpy(D)  # attach decoder to network
@@ -173,4 +189,4 @@ plt.show()
 # SAVE DATA
 np.save(f"../data/loss_clda{CLDA}_seed{SEED}.npy", losses)
 
-
+"""
