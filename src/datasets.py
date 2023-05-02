@@ -4,6 +4,13 @@ import numpy as np
 
 
 class GaussianVelocityDataset(Dataset):
+    """
+    Inputs are 5-dimensional:
+        - 2 dimensions for the target information
+        - 2 dimensions for the context
+        - 1 dimension for the hold signal
+    Targets are 2-dimensional, each dimension being Gaussian velocity profile (for x and y directions)
+    """
     def __init__(self, n_targets=8, total_duration=1.5, dt=0.01, distance=0.07,
                 hold_start=0.25, hold_end=0.25, sigma=0.1, context='arm'):
         self.n_targets = n_targets
@@ -48,7 +55,7 @@ class GaussianVelocityDataset(Dataset):
         return x, v
 
 
-class EndLossDataset(GaussianVelocityDataset):
+class HoldsDataset(GaussianVelocityDataset):
     def __init__(self, n_targets=8, total_duration=1.5, dt=0.01, distance=0.07,
                 hold_start=0.25, hold_end=0.25, sigma=0.1, context='arm'):
         super().__init__(n_targets=n_targets, total_duration=total_duration, dt=dt, distance=distance,
@@ -60,6 +67,34 @@ class EndLossDataset(GaussianVelocityDataset):
     def __getitem__(self, idx):
         # input
         x = super().construct_input(idx)
+
+        # output
+        target = torch.zeros((3*2), dtype=torch.float32)
+        target[0], target[1] = self.distance * np.cos(2*np.pi*idx/self.n_targets), self.distance * np.sin(2*np.pi*idx/self.n_targets)
+        target[2:] = 0.
+        return x, target
+
+
+class EndLossDataset(Dataset):
+    def __init__(self, n_targets=8, total_duration=1.5, dt=0.01, distance=0.07, context='arm'):
+        self.n_targets = n_targets
+        self.total_duration = total_duration  # in seconds
+        self.dt = dt  # in seconds
+        self.distance = distance  # in meters
+        self.context = context
+
+    def __len__(self):
+        return self.n_targets
+
+    def __getitem__(self, idx):
+        # input
+        L = int(self.total_duration / self.dt)
+        x = torch.zeros((L, 4),
+                        dtype=torch.float32)  # 2 cols for context, 2 cols for target position
+        x[:, 0] = np.cos(2 * np.pi * idx / self.n_targets)  # self.distance * np.cos(2*np.pi*idx/self.n_targets)
+        x[:, 1] = np.sin(2 * np.pi * idx / self.n_targets)  # self.distance * np.sin(2*np.pi*idx/self.n_targets)
+        x[:, 2] = 1. if self.context == 'arm' else 0.
+        x[:, 3] = 0. if self.context == 'arm' else 1.
 
         # output
         target = torch.zeros((3*2), dtype=torch.float32)

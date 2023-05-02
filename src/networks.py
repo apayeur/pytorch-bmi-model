@@ -3,7 +3,7 @@ import torch.nn as nn
 """
 Description:
 -----------
-Pretty much all networks described below follow the following design principles.
+All networks described below follow the following design principles.
 1) Each network contains the following modules
     - input_encoder :   Takes workspace and task variables (target position, context, effector position, hold signal) 
                         as input and output a higher-dimensional embedding of these variables. 

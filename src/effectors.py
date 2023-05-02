@@ -4,10 +4,10 @@ import math
 
 
 class PointMassArm(nn.Module):
-    def __init__(self, workspace_dim=2, tau_f=0.04, m=1., dt=0.01, reset_noise=0.):
+    def __init__(self, workspace_dim=2, tau_f=0.04, m=1., dt=0.01, reset_radius=0.):
         super().__init__()
         self.workspace_dim = workspace_dim  # dimension of the workspace
-        self.reset_noise = reset_noise      # noise in the initial position of the arm
+        self.reset_radius = reset_radius      # noise in the initial position of the arm
 
         self.lin = nn.Linear(workspace_dim + 3 * workspace_dim, 3 * workspace_dim, bias=False)
 
@@ -55,7 +55,9 @@ class PointMassArm(nn.Module):
         controls: shape = (N, L, D), where N = nb of batches, L = sequence length, D = dimension of control
         """
         all_states = torch.empty((controls.size(0), controls.size(1), 3 * self.workspace_dim))
-        state = self.reset_noise * torch.randn((controls.size(0), 3 * self.workspace_dim))
+        state = torch.zeros((controls.size(0), 3 * self.workspace_dim))
+        state[:, 0] = self.reset_radius * torch.cos(2 * math.pi * torch.rand(controls.size(0)))
+        state[:, 1] = self.reset_radius * torch.sin(2 * math.pi * torch.rand(controls.size(0)))
         all_states[:, 0, :] = state
         for t in range(1, controls.size(1)):
             combined = torch.cat((state, controls[:, t, :]), -1)
