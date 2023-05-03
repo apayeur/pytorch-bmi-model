@@ -67,15 +67,12 @@ class SimpleNet(nn.Module):
         self.readout_layer.weight.requires_grad = False
         self.motor_cortex.bias_ih_l0.requires_grad = False
 
-    def forward(self, x, h0, effector_state=None):
+    def forward(self, x, h0):
         x = self.input_encoder(x)
         x = self.input_activation(x)
         h, _ = self.motor_cortex(x, h0)
-        x = self.readout_layer(h)
-        if effector_state is None:
-            x = self.effector(x)
-        else:
-            x = self.effector(x, effector_state)
-        return x, h
+        controls = self.readout_layer(h)
+        x = self.effector(controls)
+        return x, h, controls
 
 

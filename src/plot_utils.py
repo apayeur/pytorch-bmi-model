@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
-from seaborn import despine
+from seaborn import despine, color_palette
+import numpy as np
+import torch
 
 units_convert = {'cm': 1 / 2.54, 'mm': 1 / 2.54 / 10}
 colors = [(200. / 255, 0, 0),  # red

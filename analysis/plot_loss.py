@@ -5,7 +5,7 @@ plt.style.use('../plot_params.dms')
 
 # Import data
 list_of_losses = []
-for clda in [0.0, 0.1, 0.5]:
+for clda in [0.0, 0.1, 0.5, 1.0]:
     loss = np.load(f"../data/loss_clda{clda}_seed1.npy", allow_pickle=True)
     list_of_losses.append({clda: loss})
 

@@ -39,7 +39,7 @@ parser.add_argument("-sigma", type=float, help="time spread of target velocity p
 parser.add_argument("-total_duration", type=float, help="total duration of the reach, including holding times", default=1.5)
 parser.add_argument("-hold_start", type=float, help="duration of the preparatory hold", default=0.25)
 parser.add_argument("-hold_end", type=float, help="duration of the termination hold", default=0.25)
-parser.add_argument("-noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=0.1)
+parser.add_argument("-noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=0.)
 parser.add_argument("-seed", type=str, help="seed", default=1)
 parser.add_argument("-size", type=tuple, help="size of the network (in, h1, h2, out)", default=(5, 100, 100, 2))
 args = parser.parse_args()
@@ -50,7 +50,7 @@ def plot_trajectories(net, dataset, network_size, outfile_name):
     fig, ax = plt.subplots(ncols=1, figsize=(45*units_convert['mm'], 45*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _ = net(dataset[i][0], NOISE_FOR_HIDDEN_INIT * torch.rand((1, network_size[2])))
+        pred, _, _ = net(dataset[i][0], NOISE_FOR_HIDDEN_INIT * torch.rand((1, network_size[2])))
         pred = pred.detach().numpy()
         pred_traj = dataset.dt * np.cumsum(pred, axis=0)
         target_vel = dataset[i][1].detach().numpy()
@@ -71,7 +71,7 @@ def build_bci_decoder(net, dataloader, network_size, n_readouts=10, clda=0.):
         for X, y in dataloader:
             h0 = NOISE_FOR_HIDDEN_INIT * torch.rand(
                 (1, 8, network_size[2]))  # set of initial conditions for motor cortex
-            pred, h = net(X, h0)
+            pred, h, _ = net(X, h0)
             if clda > 0.:
                 pred = y
     h = torch.reshape(h, (-1, h.size(2)))
@@ -101,7 +101,7 @@ net = SimpleNet(network_size=network_size, nonlinearity='relu')
 NOISE_FOR_HIDDEN_INIT = args.noisy_ics
 CLDA_FREQUENCY = 20     # frequency with which to perform CLDA, in number of epochs
 CLDA_START = 0          # epoch ID to start CLDA at
-CLDA = 0.0              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
+CLDA = 0.1              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
 N_READOUTS = args.n_readouts
 
 # (1) TRAIN FOR MANUAL CONTROL
@@ -111,14 +111,14 @@ dataset = GaussianVelocityDataset(n_targets=args.n_targets, total_duration=args.
 dataloader = DataLoader(dataset, batch_size=args.n_targets)
 
 loss_fn = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=3e-4)
+optimizer = torch.optim.Adam(net.parameters(), lr=2e-4)
 
-epochs = 1500
+epochs = 3000
 for t in range(epochs):
     for X, y in dataloader:
         # Compute prediction and loss
         h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
-        pred, _ = net(X, h0)
+        pred, _, _ = net(X, h0)
         loss = loss_fn(pred, y)
 
         # Backpropagation
@@ -146,7 +146,7 @@ dataloader = DataLoader(dataset, batch_size=args.n_targets)
 with torch.no_grad():
     for X, y in dataloader:
         h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))
-        pred, _ = net(X, h0)
+        pred, _, _ = net(X, h0)
 
 plot_trajectories(net, dataset, network_size, "BCIControlTrajectories_BeforeLearning.png")
 plt.show()
@@ -162,7 +162,7 @@ for t in range(epochs):
     for X, y in dataloader:
         # Compute prediction and loss
         h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
-        pred, _ = net(X, h0)
+        pred, _, _ = net(X, h0)
         loss = loss_fn(pred, y)
         losses.append(loss.item())
 

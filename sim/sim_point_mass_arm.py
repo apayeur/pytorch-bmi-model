@@ -33,35 +33,48 @@ parser.add_argument("-total_duration", type=float, help="total duration of the r
 parser.add_argument("-hold_start", type=float, help="duration of the preparatory hold", default=0.25)
 parser.add_argument("-hold_end", type=float, help="duration of the termination hold", default=0.25)
 parser.add_argument("-noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=0.1)
-parser.add_argument("-seed", type=str, help="seed", default=1)
+parser.add_argument("-seed", type=str, help="seed", default=3)
 parser.add_argument("-size", type=tuple, help="size of the network (in, h1, h2, out)", default=(4, 100, 100, 2))
 args = parser.parse_args()
 
 
 # Function definitions
 def plot_trajectories(net, dataset, network_size, outfile_name=None):
-    fig, axes = plt.subplots(ncols=2, figsize=(90*units_convert['mm'], 45*units_convert['mm']))
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(2*45*units_convert['mm'], 2*45/1.25*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _ = net(dataset[i][0].unsqueeze(0), NOISE_FOR_HIDDEN_INIT * torch.rand((1, 1, network_size[2])))
+        pred, _, controls = net(dataset[i][0].unsqueeze(0), NOISE_FOR_HIDDEN_INIT * torch.rand((1, 1, network_size[2])))
         pred = pred.detach().numpy()
+        controls = controls.detach().numpy()
         pred_traj = pred[0, :, :2]
         target = dataset[i][1].detach().numpy()
 
         # plot trajectories
-        axes[0].plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
-        axes[0].plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
+        axes[0, 0].plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
+        axes[0, 0].plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
 
         # plot velocities
         pred_vel = pred[0, :, 2:4]
-        axes[1].plot(args.dt * np.arange(len(pred_vel)), np.linalg.norm(pred_vel, axis=1), color=colors[i])
-    axes[0].axis('off')
-    axes[0].set_aspect('equal', 'box')
-    axes[0].set_xticks([])
-    axes[0].set_yticks([])
-    axes[1].set_xlabel('Time (s)')
-    axes[1].set_ylabel('Speed (m/s)')
-    despine(ax=axes[1])
+        axes[0, 1].plot(args.dt * np.arange(len(pred_vel)), np.linalg.norm(pred_vel, axis=1), color=colors[i])
+
+        # plot forces
+        pred_f = pred[0, :, 4:]
+        axes[1, 0].plot(args.dt * np.arange(len(pred_f)), np.linalg.norm(pred_f, axis=1), color=colors[i])
+
+        # plot controls
+        axes[1, 1].plot(args.dt * np.arange(len(pred_f)), np.linalg.norm(controls[0, :, :], axis=-1), color=colors[i])
+    axes[0,0].axis('off')
+    axes[0,0].set_aspect('equal', 'box')
+    axes[0,0].set_xticks([])
+    axes[0,0].set_yticks([])
+    axes[0, 1].set_xlabel('Time (s)')
+    axes[0, 1].set_ylabel('Speed (m/s)')
+    axes[1, 0].set_xlabel('Time (s)')
+    axes[1, 0].set_ylabel('Force magnitude (N)')
+    axes[1, 1].set_xlabel('Time (s)')
+    axes[1, 1].set_ylabel('Control magnitude (N)')
+    for ax in axes.ravel()[1:]:
+        despine(ax=ax)
     fig.tight_layout()
     if outfile_name is not None:
         fig.savefig(f"../results/{outfile_name}", format='png')
@@ -73,7 +86,7 @@ def build_bci_decoder(net, dataloader, network_size, n_readouts=10, clda=0.):
         for X, y in dataloader:
             h0 = NOISE_FOR_HIDDEN_INIT * torch.rand(
                 (1, 8, network_size[2]))  # set of initial conditions for motor cortex
-            pred, h = net(X, h0)
+            pred, h, _ = net(X, h0)
             if clda > 0.:
                 pass
     h = torch.reshape(h, (-1, h.size(2)))
@@ -101,8 +114,7 @@ network_size = args.size
 net = SimpleNet(network_size=network_size, nonlinearity='relu')
 
 # Use point-mass arm as effector
-pma = PointMassArm()
-net.effector = pma
+net.effector = PointMassArm()
 
 # Parameters
 NOISE_FOR_HIDDEN_INIT = args.noisy_ics
@@ -110,7 +122,8 @@ CLDA_FREQUENCY = 20     # frequency with which to perform CLDA, in number of epo
 CLDA_START = 0          # epoch ID to start CLDA at
 CLDA = 0.0              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
 GAMMA_v = 0.25
-GAMMA_f = 0.1
+GAMMA_f = 0.05
+lambda_ctrl = 0.
 N_READOUTS = args.n_readouts
 
 # (1) TRAIN FOR MANUAL CONTROL
@@ -122,18 +135,18 @@ dataset = EndLossDataset(n_targets=args.n_targets, total_duration=args.total_dur
 dataloader = DataLoader(dataset, batch_size=args.n_targets)
 
 #loss_fn = HoldsLoss(GAMMA_v, GAMMA_f, args.hold_start, args.hold_end, args.dt)  # torch.nn.MSELoss()
-loss_fn = EndLoss(GAMMA_v, GAMMA_f, args.dt)
-optimizer = torch.optim.Adam(net.parameters(), lr=3e-4)
+loss_fn = EndLoss(GAMMA_v, GAMMA_f, lambda_ctrl, args.dt)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 
-epochs = 3000
+epochs = 10000
 losses = []
-
 for t in range(epochs):
     for X, y in dataloader:
         # Compute prediction and loss
         h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
-        pred, _ = net(X, h0)
-        loss = loss_fn(pred, y.unsqueeze(1))
+        pred, _, controls = net(X, h0)
+
+        loss, loss_ctrl = loss_fn(pred, y.unsqueeze(1), controls)
 
         # Backpropagation
         optimizer.zero_grad()
@@ -141,11 +154,11 @@ for t in range(epochs):
         optimizer.step()
 
         losses.append(loss.item())
-        if t % 100 == 0:
-            print(f"Epoch {t}: loss = {loss.item():>10e}")
+        if t % 500 == 0:
+            print(f"Epoch {t}: loss = {loss.item():>10e}, loss_ctrl = {loss_ctrl.item():>10e}")
 plt.semilogy(losses)
 plt.show()
-plot_trajectories(net, dataset, network_size, "ManualControlTrajectoriesPMA.png")
+plot_trajectories(net, dataset, network_size, f"ManualControlTrajectoriesPMA_seed{SEED}.png")
 plt.show()
 
 """
