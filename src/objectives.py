@@ -29,6 +29,22 @@ class HoldsLoss(nn.Module):
 
 
 class EndLoss(nn.Module):
+    r"""
+    Objective function:
+
+    :math:`L = \|x_T - d\|^2/\delta_p^2 + \gamma_v \|\dot{x}_T\|^2/\delta_v^2
+    + \gamma_f \|f_T\|^2/\delta_f^2 + r \sum_{t=0}^{T-1} \|u_t\|^2/\delta_f^2`
+
+    where
+
+    :math:`x_T, \dot{x}_T, f_T` : final position, velocity and force/acceleration
+
+    :math:`d`: target position
+
+    :math:`\delta_p, \delta_v, \delta_f`: factors to non-dimensionalize and rescale the loss components
+
+
+    """
     def __init__(self, hyperparam_v, hyperparam_f, hyperparam_ctrl, dt, workspace_dim=2):
         super().__init__()
         self.hyperparam_v, self.hyperparam_f, self.dt = hyperparam_v, hyperparam_f, dt

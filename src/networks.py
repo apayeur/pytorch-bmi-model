@@ -85,7 +85,7 @@ class NoisyNet(SimpleNet):
 
 
 class NoisyRNN(nn.RNN):
-    """
+    r"""
     Noisy RNN with decay.
 
     :math:`v_t = v_{t-1} + \\alpha (-v_{t-1} + Wf(v_{t-1}) + U x_t + b_h + b_i) + \sigma \sqrt{\\alpha} \xi_t`
