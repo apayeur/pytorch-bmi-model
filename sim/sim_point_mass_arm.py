@@ -6,7 +6,7 @@ import sys
 sys.path.append("../src")
 from datasets import HoldsDataset, EndLossDataset
 from effectors import PointMassArm
-from networks import SimpleNet
+from networks import SimpleNet, NoisyRNN
 from objectives import HoldsLoss, EndLoss
 import numpy as np
 import argparse
@@ -112,6 +112,8 @@ torch.manual_seed(SEED)
 # Define network
 network_size = args.size
 net = SimpleNet(network_size=network_size, nonlinearity='relu')
+net.motor_cortex = NoisyRNN(input_size=network_size[1], hidden_size=network_size[2],
+                                   nonlinearity='relu', batch_first=True)
 
 # Use point-mass arm as effector
 net.effector = PointMassArm()
@@ -138,7 +140,7 @@ dataloader = DataLoader(dataset, batch_size=args.n_targets)
 loss_fn = EndLoss(GAMMA_v, GAMMA_f, lambda_ctrl, args.dt)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 
-epochs = 10000
+epochs = 5000
 losses = []
 for t in range(epochs):
     for X, y in dataloader:

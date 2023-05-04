@@ -1,5 +1,6 @@
 import torch.nn as nn
-
+import torch
+import torch.nn.functional as F
 """
 Description:
 -----------
@@ -24,7 +25,7 @@ class SimpleNet(nn.Module):
         self.nonlinearity = nonlinearity
         self.network_size = network_size
         self.input_encoder = nn.Linear(network_size[0], network_size[1])
-        self.input_activation = nn.ReLU() if nonlinearity=='relu' else nn.Tanh()
+        self.input_activation = nn.ReLU() if nonlinearity == 'relu' else nn.Tanh()
         self.motor_cortex = nn.RNN(input_size=network_size[1], hidden_size=network_size[2],
                                    nonlinearity=nonlinearity, batch_first=True)
         self.readout_layer = nn.Linear(network_size[2], network_size[3], bias=False)
@@ -74,5 +75,77 @@ class SimpleNet(nn.Module):
         controls = self.readout_layer(h)
         x = self.effector(controls)
         return x, h, controls
+
+
+class NoisyRNN(nn.RNN):
+    """
+    Noisy RNN with decay.
+    h_{t+1} = h_t + alpha * (-h_t + Wf(h_t) + U x_{t+1} + b_h + b_i) + sigma*sqrt(alpha)*xi_t
+    where xi_t = standard Gaussian variate
+    """
+    def __init__(self, *args, **kwargs):
+        self.alpha = kwargs.pop('alpha', 0.2)
+        self.sigma = kwargs.pop('sigma', 5e-3)
+        super().__init__(*args, **kwargs)
+        assert self.num_layers == 1, "No support for multiple layers"
+        assert not self.bidirectional, "No support for bidirectionality for NoisyRNN"
+        assert self.dropout == 0, "No support for dropout"
+
+    def forward(self, x, h0=None):
+        assert (x.dim() in (2, 3)), f"RNN: Expected input to be 2-D or 3-D but received {x.dim()}-D tensor"
+        is_batched = x.dim() == 3
+        batch_dim = 0 if self.batch_first else 1
+        if not is_batched:
+            x = x.unsqueeze(batch_dim)
+            if h0 is not None:
+                if h0.dim() != 2:
+                    raise RuntimeError(
+                        f"For unbatched 2-D input, h0 should also be 2-D but got {h0.dim()}-D tensor")
+                h0 = h0.unsqueeze(1)
+        else:
+            if h0 is not None and h0.dim() != 3:
+                raise RuntimeError(
+                    f"For batched 3-D input, h0 should also be 3-D but got {h0.dim()}-D tensor")
+
+        if h0 is None:
+            h0 = torch.zeros(1, self.hidden_size, dtype=x.dtype, device=x.device)
+
+        assert self.mode == 'RNN_TANH' or self.mode == 'RNN_RELU'
+
+        output = torch.empty((x.shape[0], x.shape[1], self.hidden_size))
+        if self.mode == 'RNN_TANH':
+            h = h0
+            if self.batch_first:
+                for t in range(x.size(1)):
+                    xi = torch.randn((1, self.hidden_size))
+                    h = h + self.alpha * (-h + F.tanh(h) @ self.weight_hh_l0.T +
+                                              x[:, t, :] @ self.weight_ih_l0.T +
+                                              self.bias_ih_l0 + self.bias_hh_l0) + self.sigma*self.alpha**0.5*xi
+                    output[:, t, :] = F.tanh(h)
+            else:
+                for t in range(x.size(1)):
+                    xi = torch.randn((1, self.hidden_size))
+                    h = h + self.alpha * (-h + F.tanh(h) @ self.weight_hh_l0.T +
+                                              x[t, :, :] @ self.weight_ih_l0.T +
+                                              self.bias_ih_l0 + self.bias_hh_l0) + self.sigma*self.alpha**0.5*xi
+                    output[t, :, :] = F.tanh(h)
+        elif self.mode == 'RNN_RELU':
+            h = h0
+            if self.batch_first:
+                for t in range(x.size(1)):
+                    xi = torch.randn((1, self.hidden_size))
+                    h = h + self.alpha * (-h + F.relu(h) @ self.weight_hh_l0.T +
+                                          x[:, t, :] @ self.weight_ih_l0.T +
+                                          self.bias_ih_l0 + self.bias_hh_l0) + self.sigma * self.alpha ** 0.5 * xi
+                    output[:, t, :] = F.relu(h)
+            else:
+                for t in range(x.size(1)):
+                    xi = torch.randn((1, self.hidden_size))
+                    h = h + self.alpha * (-h + F.relu(h) @ self.weight_hh_l0.T +
+                                          x[t, :, :] @ self.weight_ih_l0.T +
+                                          self.bias_ih_l0 + self.bias_hh_l0) + self.sigma * self.alpha ** 0.5 * xi
+                    output[t, :, :] = F.relu(h)
+        return output, output[:, -1, :] if self.batch_first else output[-1, :, :]
+
 
 
