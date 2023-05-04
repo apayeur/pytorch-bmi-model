@@ -6,7 +6,7 @@ import sys
 sys.path.append("../src")
 from datasets import HoldsDataset, EndLossDataset
 from effectors import PointMassArm
-from networks import SimpleNet, NoisyRNN
+from networks import SimpleNet, NoisyRNN, NoisyNet
 from objectives import HoldsLoss, EndLoss
 import numpy as np
 import argparse
@@ -33,7 +33,7 @@ parser.add_argument("-total_duration", type=float, help="total duration of the r
 parser.add_argument("-hold_start", type=float, help="duration of the preparatory hold", default=0.25)
 parser.add_argument("-hold_end", type=float, help="duration of the termination hold", default=0.25)
 parser.add_argument("-noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=0.1)
-parser.add_argument("-seed", type=str, help="seed", default=3)
+parser.add_argument("-seed", type=str, help="seed", default=2)
 parser.add_argument("-size", type=tuple, help="size of the network (in, h1, h2, out)", default=(4, 100, 100, 2))
 args = parser.parse_args()
 
@@ -111,9 +111,7 @@ torch.manual_seed(SEED)
 
 # Define network
 network_size = args.size
-net = SimpleNet(network_size=network_size, nonlinearity='relu')
-net.motor_cortex = NoisyRNN(input_size=network_size[1], hidden_size=network_size[2],
-                                   nonlinearity='relu', batch_first=True)
+net = NoisyNet(network_size=network_size, nonlinearity='relu')
 
 # Use point-mass arm as effector
 net.effector = PointMassArm()
@@ -125,7 +123,7 @@ CLDA_START = 0          # epoch ID to start CLDA at
 CLDA = 0.0              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
 GAMMA_v = 0.25
 GAMMA_f = 0.05
-lambda_ctrl = 0.
+lambda_ctrl = 0.01
 N_READOUTS = args.n_readouts
 
 # (1) TRAIN FOR MANUAL CONTROL
@@ -140,14 +138,15 @@ dataloader = DataLoader(dataset, batch_size=args.n_targets)
 loss_fn = EndLoss(GAMMA_v, GAMMA_f, lambda_ctrl, args.dt)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 
-epochs = 5000
+epochs = 10000
 losses = []
 for t in range(epochs):
     for X, y in dataloader:
-        # Compute prediction and loss
+        # Prediction
         h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
         pred, _, controls = net(X, h0)
 
+        # Loss
         loss, loss_ctrl = loss_fn(pred, y.unsqueeze(1), controls)
 
         # Backpropagation
@@ -157,10 +156,10 @@ for t in range(epochs):
 
         losses.append(loss.item())
         if t % 500 == 0:
-            print(f"Epoch {t}: loss = {loss.item():>10e}, loss_ctrl = {loss_ctrl.item():>10e}")
+            print(f"Epoch {t}: loss = {loss.item():>10e},  loss_Ctrl = {loss_ctrl.item():>10e}")
 plt.semilogy(losses)
 plt.show()
-plot_trajectories(net, dataset, network_size, f"ManualControlTrajectoriesPMA_seed{SEED}.png")
+plot_trajectories(net, dataset, network_size, f"ManualControlTrajectoriesPMA_seed{SEED}_lambdactrl{lambda_ctrl}.png")
 plt.show()
 
 """
