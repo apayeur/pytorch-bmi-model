@@ -1,7 +1,9 @@
 import torch
 import os
+import sys
 import numpy as np
 from torch.utils.data import DataLoader
+sys.path.append("../src")
 from datasets import EndLossDataset
 from effectors import PointMassArm, VelocityRegressorBCI
 import matplotlib.pyplot as plt
@@ -14,13 +16,13 @@ plt.style.use('../plot_params.dms')
 
 # Arguments parsing
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_readouts", type=int, help="number of readout units", default=12)
-parser.add_argument("--seed", type=str, help="seed", default=2)
+parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
+parser.add_argument("--seed", type=str, help="seed", default=1)
 parser.add_argument("--clda_frequency", type=int,
-                    help="frequency with which to perform CLDA, in number of epochs", default=20)
+                    help="frequency with which to perform CLDA, in number of epochs", default=50)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
 parser.add_argument("--clda", type=float,
-                    help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.1)
+                    help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.5)
 args = parser.parse_args()
 
 # CLDA parameters
@@ -61,14 +63,14 @@ net.effector = VelocityRegressorBCI()                            # remove the ar
 # Test BCI control before learning
 _, ax = plt.subplots(figsize=(45*units_convert['mm'], 45*units_convert['mm']))
 plot_trajectories(ax, net, dataset, params['noisy_ics'])
-plt.savefig(os.path.join(RESULTDIR, f"BCITrajectoriesBeforeLearning_seed{seed}.png"))
+plt.savefig(os.path.join(RESULTDIR, f"BCITrajectoriesBeforeLearning_seed{seed}_clda{clda}.png"))
 
 
 # Training under BCI control
 epochs = 1000
 lambda_ctrl = 0.
 loss_fn = EndLoss(params['gamma_v'], params['gamma_f'], lambda_ctrl, params['dt'])
-optimizer = torch.optim.SGD(net.parameters(), lr=5e-5)
+optimizer = torch.optim.SGD(net.parameters(), lr=1e-5)
 optimizer.zero_grad()
 next_CLDA = clda_start
 losses = []
@@ -91,7 +93,7 @@ for t in range(epochs):
         if clda > 0:
             if t == next_CLDA:
                 D_new = build_bci_decoder(net, dataloader, params['noisy_ics'], n_readouts=args.n_readouts, clda=args.clda)
-                D = (1. - clda) * D_new + clda * D
+                D = clda * D_new + (1 - clda) * D
                 net.readout_layer.weight.data = torch.from_numpy(D)
                 next_CLDA += clda_frequency
 

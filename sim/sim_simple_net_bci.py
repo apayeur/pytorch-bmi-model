@@ -101,7 +101,7 @@ net = SimpleNet(network_size=network_size, nonlinearity='relu')
 NOISE_FOR_HIDDEN_INIT = args.noisy_ics
 CLDA_FREQUENCY = 20     # frequency with which to perform CLDA, in number of epochs
 CLDA_START = 0          # epoch ID to start CLDA at
-CLDA = 0.1              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
+CLDA = 0.              # intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)
 N_READOUTS = args.n_readouts
 
 # (1) TRAIN FOR MANUAL CONTROL
@@ -175,7 +175,7 @@ for t in range(epochs):
         if CLDA > 0:
             if t == next_CLDA:
                 D_new = build_bci_decoder(net, dataloader, network_size, n_readouts=N_READOUTS, clda=CLDA)
-                D = (1. - CLDA) * D_new + CLDA * D
+                D = CLDA * D_new + (1-CLDA) * D
                 net.readout_layer.weight.data = torch.from_numpy(D)  # attach decoder to network
                 next_CLDA += CLDA_FREQUENCY
 

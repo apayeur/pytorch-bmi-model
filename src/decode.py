@@ -27,7 +27,9 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
 
 def rotate_velocities(dynamics, targets):
     workspace_dim = 2 if dynamics.shape[-1] == 6 else 3
+
     speed = torch.linalg.vector_norm(dynamics[:, :, workspace_dim:2*workspace_dim], dim=-1, keepdim=True)
+
     target_positions = targets[:, :workspace_dim]
     unit_vectors_towards_targets = (target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim])\
                                    /torch.linalg.vector_norm(target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1, keepdim=True)
