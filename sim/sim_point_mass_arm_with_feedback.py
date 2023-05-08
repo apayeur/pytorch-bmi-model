@@ -6,7 +6,7 @@ import sys
 sys.path.append("../src")
 from datasets import HoldsDataset, EndLossDataset
 from effectors import PointMassArm
-from networks import SimpleNet, NoisyRNN, NoisyNet
+from networks import SimpleNet, NoisyRNN, NoisyNet, NoisyNetWithFeedback
 from objectives import HoldsLoss, EndLoss
 import numpy as np
 import os
@@ -34,7 +34,7 @@ parser.add_argument("--gamma_v", type=float, help="hyperparameter for end-veloci
 parser.add_argument("--gamma_f", type=float, help="hyperparameter for end-force loss", default=0.05)
 parser.add_argument("--lambda_ctrl", type=float, help="hyperparameter for control loss", default=0.05)
 parser.add_argument("--lr", type=float, help="learning rate", default=5e-4)
-parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(4, 100, 100, 2))
+parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(8, 100, 100, 2))
 args = parser.parse_args()
 
 
@@ -43,7 +43,7 @@ def plot_trajectories(net, dataset, outfile_name=None):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(2*45*units_convert['mm'], 2*45/1.25*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
+        pred, _, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, net.network_size[2])))
         pred = pred.detach().numpy()
         controls = controls.detach().numpy()
         pred_traj = pred[0, :, :2]
@@ -106,7 +106,7 @@ torch.manual_seed(seed)
 
 # Define network
 network_size = args.size
-net = NoisyNet(network_size=network_size, nonlinearity=args.nonlinearity)
+net = NoisyNetWithFeedback(network_size=network_size, nonlinearity=args.nonlinearity, delay=10, feedback_type='position_and_velocity')
 
 # Use point-mass arm as effector
 net.effector = PointMassArm()
@@ -125,12 +125,14 @@ loss_fn = EndLoss(args.gamma_v, args.gamma_f, args.lambda_ctrl, args.dt)
 
 # Training
 optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-epochs = 7500
+epochs = 5000
 losses = []
+plot_trajectories(net, dataset)
+plt.show()
 for t in range(epochs):
     for X, y in dataloader:
         # Prediction
-        v0 = args.noisy_ics*torch.rand((1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
+        v0 = args.noisy_ics*torch.rand((args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
         pred, _, controls = net(X, v0)
 
         # Loss

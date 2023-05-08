@@ -17,7 +17,7 @@ plt.style.use('../plot_params.dms')
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
-parser.add_argument("--seed", type=str, help="seed", default=1)
+parser.add_argument("--seed", type=str, help="seed", default=11)
 parser.add_argument("--clda_frequency", type=int,
                     help="frequency with which to perform CLDA, in number of epochs", default=50)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
