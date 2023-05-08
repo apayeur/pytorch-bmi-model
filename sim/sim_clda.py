@@ -8,7 +8,7 @@ from datasets import EndLossDataset
 from effectors import PointMassArm, VelocityRegressorBCI
 import matplotlib.pyplot as plt
 from plot_utils import units_convert, plot_trajectories, plot_single_loss
-from networks import NoisyNet
+from networks import NoisyNetWithFeedback
 from decode import build_bci_decoder
 from objectives import EndLoss
 import argparse
@@ -17,12 +17,12 @@ plt.style.use('../plot_params.dms')
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
-parser.add_argument("--seed", type=str, help="seed", default=11)
+parser.add_argument("--seed", type=str, help="seed", default=1)
 parser.add_argument("--clda_frequency", type=int,
                     help="frequency with which to perform CLDA, in number of epochs", default=50)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
 parser.add_argument("--clda", type=float,
-                    help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.5)
+                    help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.1)
 args = parser.parse_args()
 
 # CLDA parameters
@@ -32,10 +32,10 @@ clda = args.clda
 
 # Load data
 seed = args.seed
-MANUAL_DATADIR = "../data/point-mass-arm"
+MANUAL_DATADIR = "../data/point-mass-arm-with-feedback"
 params = np.load(os.path.join(MANUAL_DATADIR, f"params_seed{seed}.npy"), allow_pickle=True).item()
 
-net = NoisyNet(network_size=params['size'], nonlinearity=params['nonlinearity'])
+net = NoisyNetWithFeedback(network_size=params['size'], nonlinearity=params['nonlinearity'], delay=params['delay'])
 net.effector = PointMassArm()  # must add point-mass arm before loading
 net.load_state_dict(torch.load(os.path.join(MANUAL_DATADIR, f"model_seed{seed}.pth")))
 net.eval()
@@ -43,8 +43,8 @@ net.eval()
 
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
-DATADIR = "../data/bci"
-RESULTDIR = "../results/bci"
+DATADIR = "../data/bci-with-feedback"
+RESULTDIR = "../results/bci-with-feedback"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):

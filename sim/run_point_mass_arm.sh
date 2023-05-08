@@ -1,6 +1,6 @@
 #!/bin/bash
 
-N_SEEDS=10
+N_SEEDS=1
 
 for (( i=1; i<=$N_SEEDS; i++ ))
   do

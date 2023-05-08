@@ -164,12 +164,13 @@ class NoisyNetWithFeedback(NoisyNet):
 
     def forward(self, x, v0):
         assert x.dim() == 3, f"RNN: Expected input to be 3-D but received {x.dim()}-D tensor"
-        assert v0.dim() == 2, f"RNN: Expected second input to be 2-D but received {v0.dim()}-D tensor"
+        assert v0.dim() == 3, f"RNN: Expected second input to be 3-D but received {v0.dim()}-D tensor"
         assert self.nonlinearity == 'tanh' or self.nonlinearity == 'relu'
 
         if v0 is None:
             v0 = torch.zeros(x.dim(0), self.network_size[2], dtype=x.dtype, device=x.device)
-
+        else:
+            v0 = v0.squeeze()
         # Output: hidden-layer activity, effector states and controls
         h = torch.empty((x.shape[0], x.shape[1], self.network_size[2]))
         effector_states = torch.empty((x.shape[0], x.shape[1], 3*self.effector.workspace_dim))

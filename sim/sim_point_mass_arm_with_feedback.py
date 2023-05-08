@@ -28,13 +28,14 @@ parser.add_argument("--n_targets", type=int, help="number of targets", default=8
 parser.add_argument("--dt", type=float, help="integration time step", default=0.01)
 parser.add_argument("--total_duration", type=float, help="total duration of the reach, including holding times", default=1.)
 parser.add_argument("--noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=1.)
-parser.add_argument("--seed", type=str, help="seed", default=11)
+parser.add_argument("--seed", type=str, help="seed", default=1)
 parser.add_argument("--nonlinearity", type=str, help="nonlinearity", default='relu')
 parser.add_argument("--gamma_v", type=float, help="hyperparameter for end-velocity loss", default=0.25)
 parser.add_argument("--gamma_f", type=float, help="hyperparameter for end-force loss", default=0.05)
 parser.add_argument("--lambda_ctrl", type=float, help="hyperparameter for control loss", default=0.05)
+parser.add_argument("--delay", type=int, help="hyperparameter for control loss", default=0)
 parser.add_argument("--lr", type=float, help="learning rate", default=5e-4)
-parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(8, 100, 100, 2))
+parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(6, 100, 100, 2))
 args = parser.parse_args()
 
 
@@ -93,8 +94,8 @@ def plot_loss(l, outfile_name=None):
 
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
-DATADIR = "../data/point-mass-arm"
-RESULTDIR = "../results/point-mass-arm"
+DATADIR = "../data/point-mass-arm-with-feedback"
+RESULTDIR = "../results/point-mass-arm-with-feedback"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -106,7 +107,8 @@ torch.manual_seed(seed)
 
 # Define network
 network_size = args.size
-net = NoisyNetWithFeedback(network_size=network_size, nonlinearity=args.nonlinearity, delay=10, feedback_type='position_and_velocity')
+net = NoisyNetWithFeedback(network_size=network_size, nonlinearity=args.nonlinearity,
+                           delay=args.delay, feedback_type='position_only')
 
 # Use point-mass arm as effector
 net.effector = PointMassArm()
@@ -127,12 +129,10 @@ loss_fn = EndLoss(args.gamma_v, args.gamma_f, args.lambda_ctrl, args.dt)
 optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
 epochs = 5000
 losses = []
-plot_trajectories(net, dataset)
-plt.show()
 for t in range(epochs):
     for X, y in dataloader:
         # Prediction
-        v0 = args.noisy_ics*torch.rand((args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
+        v0 = args.noisy_ics*torch.rand((1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
         pred, _, controls = net(X, v0)
 
         # Loss
