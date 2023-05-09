@@ -44,7 +44,8 @@ def plot_trajectories(net, dataset, outfile_name=None):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(2*45*units_convert['mm'], 2*45/1.25*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, net.network_size[2])))
+        pred, h, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
+        print("min h =", torch.min(h.detach()).item(), "max h =", torch.max(h.detach()).item())
         pred = pred.detach().numpy()
         controls = controls.detach().numpy()
         pred_traj = pred[0, :, :2]
@@ -128,6 +129,8 @@ loss_fn = EndLoss(args.gamma_v, args.gamma_f, args.lambda_ctrl, args.dt)
 # Training
 optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
 epochs = 5000
+#plot_trajectories(net, dataset)
+#plt.show()
 losses = []
 for t in range(epochs):
     for X, y in dataloader:

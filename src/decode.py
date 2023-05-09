@@ -22,6 +22,10 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
     # define readout matrix
     R = np.zeros((n_readouts, net.network_size[2]), dtype=np.float32)  # tensor will have to be a float, not a double
     R[range(n_readouts), range(n_readouts)] = 1.
+
+    # print max activity for each readout (to make sure no dead units)
+    if clda < 1e-6:
+        print(torch.max(torch.from_numpy(R) @ h.T, dim=1))
     return T @ R
 
 

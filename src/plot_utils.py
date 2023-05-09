@@ -14,7 +14,7 @@ colors = [(200. / 255, 0, 0),  # red
                  (0.8, 0.6, 0.7)]  # pink
 
 
-def plot_loss(list_of_dicts, outfile_name=None):
+def plot_loss(list_of_dicts, outfile_name=None, errorbar_type='sem'):
     """
     Plot loss.
 
@@ -24,12 +24,32 @@ def plot_loss(list_of_dicts, outfile_name=None):
     """
     figsize = (3, 3 / 1.25) if outfile_name is None else (45 * units_convert['mm'], 45 / 1.25 * units_convert['mm'])
     plt.figure(figsize=figsize)
-    for i, loss in enumerate(list_of_dicts):
-        clda = list(loss.keys())[0]
-        val = list(loss.values())[0]
-        plt.semilogy(val, color='black' if clda < 1e-6 else colors[i], label=f"CLDA = {clda}")
+
+    # Gather all the CLDA values in the list
+    clda_values = set()
+    for ld in list_of_dicts:
+        for k in ld.keys():
+            clda_values.add(k)
+
+    losses = {clda: [] for clda in clda_values}
+    for ld in list_of_dicts:
+        for k, v in ld.items():
+            losses[k].append(v)
+
+    # Plot mean +/- error bar for each CLDA value
+    for i, clda in enumerate(sorted(clda_values)):
+        mean_loss = np.mean(np.log10(losses[clda]), axis=0)
+        if errorbar_type == 'sem':
+            errorbar = np.std(np.log10(losses[clda]), axis=0, ddof=1) / len(losses[clda])**0.5
+        elif errorbar == 'std':
+            errorbar = np.std(np.log10(losses[clda]), axis=0, ddof=1)
+
+        plt.plot(np.arange(len(mean_loss)), mean_loss,
+                     color='black' if clda < 1e-6 else colors[i], label=f"CLDA = {clda}", lw=0.5)
+        plt.fill_between(np.arange(len(mean_loss)), mean_loss-errorbar, mean_loss+errorbar,
+                         color='black' if clda < 1e-6 else colors[i], lw=0, alpha=0.5)
     plt.xlabel("Epoch")
-    plt.ylabel("Loss")
+    plt.ylabel("Log loss")
     plt.legend(loc="upper right")
     despine()
     plt.tight_layout()

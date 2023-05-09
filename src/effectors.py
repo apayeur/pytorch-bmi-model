@@ -89,7 +89,7 @@ class PointMassArm(nn.Module):
         return all_states
 
 
-class VelocityRegressorBCI(nn.Module):
+class VelocityIntegrator(nn.Module):
     def __init__(self, workspace_dim=2, dt=0.01, reset_radius=0.):
         super().__init__()
         self.workspace_dim = workspace_dim  # dimension of the workspace
@@ -162,5 +162,6 @@ class VelocityRegressorBCI(nn.Module):
             combined = torch.cat((states_prev, velocities), -1)
             all_states = self.lin(combined)
         return all_states
+
 
 
