@@ -4,7 +4,7 @@ from plot_utils import units_convert, plot_loss
 plt.style.use('../plot_params.dms')
 
 # Import data
-dir_name = "bci-with-feedback-SGD-nonstop"
+dir_name = "bci-with-feedback-SGD-nonstop-lowerlr"
 list_of_losses = []
 for seed in range(1, 11):
     for clda in [0.0, 0.1, 0.5]:

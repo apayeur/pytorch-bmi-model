@@ -17,7 +17,7 @@ plt.style.use('../plot_params.dms')
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
-parser.add_argument("--seed", type=str, help="seed", default=1)
+parser.add_argument("--seed", type=str, help="seed", default=3)
 parser.add_argument("--clda_frequency", type=int,
                     help="frequency with which to perform CLDA, in number of epochs", default=50)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
@@ -47,8 +47,8 @@ torch.manual_seed(seed)
 
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
-DATADIR = "../data/bci-with-feedback-SGD-nonstop"
-RESULTDIR = "../results/bci-with-feedback-SGD-nonstop"
+DATADIR = "../data/bci-with-feedback-SGD-nonstop-lowerlr"
+RESULTDIR = "../results/bci-with-feedback-SGD-nonstop-lowerlr"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -74,7 +74,7 @@ plt.savefig(os.path.join(RESULTDIR, f"BCITrajectoriesBeforeLearning_seed{seed}_c
 epochs = 2000
 lambda_ctrl = 0.
 loss_fn = EndLoss(params['gamma_v'], params['gamma_f'], lambda_ctrl, params['dt'])
-optimizer = torch.optim.SGD(net.parameters(), lr=2e-5)
+optimizer = torch.optim.SGD(net.parameters(), lr=1e-5)
 optimizer.zero_grad()
 next_CLDA = clda_start
 losses = []
