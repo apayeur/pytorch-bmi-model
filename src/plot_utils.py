@@ -61,14 +61,15 @@ def plot_loss(list_of_dicts, outfile_name=None, errorbar_type='sem'):
 
 def plot_trajectories(ax, net, dataset, noise_for_hidden_init):
     colors = color_palette('colorblind', dataset.n_targets)
-    for i in range(dataset.n_targets):
-        pred, _, _ = net(dataset[i][0].unsqueeze(0), noise_for_hidden_init * torch.rand((1, 1, net.network_size[2])))
-        pred = pred.detach().numpy()
-        pred_traj = pred[0, :, :2]
-        target = dataset[i][1].detach().numpy()
+    with torch.no_grad():
+        for i in range(dataset.n_targets):
+            pred, _, _ = net(dataset[i][0].unsqueeze(0), noise_for_hidden_init * torch.rand((1, 1, net.network_size[2])))
+            pred = pred.detach().numpy()
+            pred_traj = pred[0, :, :2]
+            target = dataset[i][1].detach().numpy()
 
-        ax.plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
-        ax.plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
+            ax.plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
+            ax.plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
     ax.axis('off')
     ax.set_aspect('equal', 'box')
     ax.set_xticks([])

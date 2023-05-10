@@ -81,6 +81,7 @@ class EndLossDataset(Dataset):
         self.total_duration = total_duration  # in seconds
         self.dt = dt  # in seconds
         self.distance = distance  # in meters
+        assert context == 'arm' or context == 'bci', f"Context must be `arm` or `bci`, not {context}."
         self.context = context
 
     def __len__(self):

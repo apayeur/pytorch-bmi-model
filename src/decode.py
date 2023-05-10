@@ -23,9 +23,9 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
     R = np.zeros((n_readouts, net.network_size[2]), dtype=np.float32)  # tensor will have to be a float, not a double
     R[range(n_readouts), range(n_readouts)] = 1.
 
-    # print max activity for each readout (to make sure no dead units)
+    # print max activity for each readout
     if clda < 1e-6:
-        print(torch.max(torch.from_numpy(R) @ h.T, dim=1))
+        print("Max activity = ", torch.max(h.detach()))
     return T @ R
 
 
@@ -37,6 +37,10 @@ def rotate_velocities(dynamics, targets):
     target_positions = targets[:, :workspace_dim]
     unit_vectors_towards_targets = (target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim])\
                                    /torch.linalg.vector_norm(target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1, keepdim=True)
+    #print(torch.linalg.vector_norm(target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1))
+    #print(torch.linalg.vector_norm(target_positions.unsqueeze(1), dim=-1))
+    #print(torch.linalg.vector_norm( dynamics[:, :, :workspace_dim], dim=-1))
+
     dynamics[:, :, workspace_dim:2*workspace_dim] = speed * unit_vectors_towards_targets
 
     return dynamics

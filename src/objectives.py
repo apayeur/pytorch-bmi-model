@@ -45,9 +45,10 @@ class EndLoss(nn.Module):
 
 
     """
-    def __init__(self, hyperparam_v, hyperparam_f, hyperparam_ctrl, dt, workspace_dim=2):
+    def __init__(self, hyperparam_v, hyperparam_f, hyperparam_ctrl, hyperparam_rate, dt, workspace_dim=2):
         super().__init__()
         self.hyperparam_v, self.hyperparam_f, self.dt = hyperparam_v, hyperparam_f, dt
+        self.hyperparam_rate = hyperparam_rate
         self.hyperparam_ctrl = hyperparam_ctrl
         self.workspace_dim = workspace_dim
         if workspace_dim == 2:
@@ -63,10 +64,13 @@ class EndLoss(nn.Module):
                                                   hyperparam_v ** 0.5, hyperparam_v ** 0.5, hyperparam_v ** 0.5,
                                                   hyperparam_f ** 0.5, hyperparam_f ** 0.5, hyperparam_f ** 0.5]]])
 
-    def forward(self, prediction, target, controls):
+    def forward(self, prediction, target, controls, activities):
         loss = 0.
         loss_ctrl = self.hyperparam_ctrl * torch.mean(controls**2) / self.non_dimensionalizer[0, 0, -1]**2
         loss += loss_ctrl
+
+        loss_rate = self.hyperparam_rate * torch.mean(activities**2)
+        loss += loss_rate
 
         prediction = prediction / self.non_dimensionalizer * self.hyperparam_vec
         target = target / self.non_dimensionalizer * self.hyperparam_vec
@@ -77,4 +81,4 @@ class EndLoss(nn.Module):
         #                    - target.squeeze()[:, self.workspace_dim:2*self.workspace_dim]) ** 2)
         #loss += torch.mean((prediction[:, -3, 2*self.workspace_dim:] - target.squeeze()[:, 2*self.workspace_dim:]) ** 2)
 
-        return loss, loss_ctrl
+        return loss, loss_ctrl, loss_rate

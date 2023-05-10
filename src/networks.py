@@ -107,8 +107,10 @@ class SimpleNet(nn.Module):
     def _initialize_params(self):
         # -- Weights --
         # Encoder
-        nn.init.uniform_(self.input_encoder.weight, a=-(6 / self.input_encoder.weight.size(1)) ** 0.5,
-                         b=(6 / self.input_encoder.weight.size(1)) ** 0.5)
+        #nn.init.uniform_(self.input_encoder.weight, a=-(6 / self.input_encoder.weight.size(1)) ** 0.5,
+        #                 b=(6 / self.input_encoder.weight.size(1)) ** 0.5)
+        nn.init.uniform_(self.input_encoder.weight, a=-(3 / self.input_encoder.weight.size(1)) ** 0.5,
+                                          b=(3 / self.input_encoder.weight.size(1)) ** 0.5)
                         #std=(2. / self.input_encoder.weight.size(1)) ** 0.5)
         # Motor cortex
         nn.init.uniform_(self.motor_cortex.weight_ih_l0,
@@ -117,7 +119,7 @@ class SimpleNet(nn.Module):
         nn.init.normal_(self.motor_cortex.weight_hh_l0,
                         std=1. / self.motor_cortex.weight_hh_l0.size(1) ** 0.5)  # recurrent weight matrix
         # Readout layer
-        nn.init.normal_(self.readout_layer.weight, std=0.5 / self.readout_layer.weight.size(1))
+        nn.init.normal_(self.readout_layer.weight, std=0.25 / self.readout_layer.weight.size(1))
 
         # -- Biases --
         if self.nonlinearity == 'relu':
