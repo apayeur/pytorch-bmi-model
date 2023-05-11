@@ -28,45 +28,47 @@ parser.add_argument("--n_targets", type=int, help="number of targets", default=8
 parser.add_argument("--dt", type=float, help="integration time step", default=0.01)
 parser.add_argument("--total_duration", type=float, help="total duration of the reach, including holding times", default=1.)
 parser.add_argument("--noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=1.)
+parser.add_argument("--reset_radius", type=float, help="noise intensity for arm initial condition", default=0.005)
 parser.add_argument("--seed", type=str, help="seed", default=4)
 parser.add_argument("--nonlinearity", type=str, help="nonlinearity", default='relu')
 parser.add_argument("--gamma_v", type=float, help="hyperparameter for end-velocity loss", default=0.25)
 parser.add_argument("--gamma_f", type=float, help="hyperparameter for end-force loss", default=0.05)
 parser.add_argument("--lambda_ctrl", type=float, help="hyperparameter for control loss", default=0.05)  # was 0.05
 parser.add_argument("--lambda_rate", type=float, help="hyperparameter for rate loss", default=0.)
-parser.add_argument("--delay", type=int, help="hyperparameter for control loss", default=0)
+parser.add_argument("--delay", type=int, help="hyperparameter for control loss", default=10)
 parser.add_argument("--lr", type=float, help="learning rate", default=5e-4)
 parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(6, 100, 100, 2))
 args = parser.parse_args()
 
 
 # Function definitions
-def plot_trajectories(net, dataset, outfile_name=None):
+def plot_trajectories(net, dataset, outfile_name=None, n_reals=5):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(2*45*units_convert['mm'], 2*45/1.25*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     with torch.no_grad():
-        for i in range(dataset.n_targets):
-            pred, h, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
-            print("max h =", torch.max(h.detach()).item())
-            pred = pred.detach().numpy()
-            controls = controls.detach().numpy()
-            pred_traj = pred[0, :, :2]
-            target = dataset[i][1].detach().numpy()
+        if n_reals > 1 and args.reset_radius > 0:
+            for _ in range(n_reals):
+                for i in range(dataset.n_targets):
+                    pred, h, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
+                    pred = pred.detach().numpy()
+                    controls = controls.detach().numpy()
+                    pred_traj = pred[0, :, :2]
+                    target = dataset[i][1].detach().numpy()
 
-            # plot trajectories
-            axes[0, 0].plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
-            axes[0, 0].plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
+                    # plot trajectories
+                    axes[0, 0].plot(pred_traj[:, 0], pred_traj[:, 1], color=colors[i])
+                    axes[0, 0].plot(target[0], target[1], color=colors[i], marker='o', markersize=3, lw=0.)
 
-            # plot velocities
-            pred_vel = pred[0, :, 2:4]
-            axes[0, 1].plot(args.dt * np.arange(len(pred_vel)), np.linalg.norm(pred_vel, axis=1), color=colors[i])
+                    # plot velocities
+                    pred_vel = pred[0, :, 2:4]
+                    axes[0, 1].plot(args.dt * np.arange(len(pred_vel)), np.linalg.norm(pred_vel, axis=1), color=colors[i])
 
-            # plot forces
-            pred_f = pred[0, :, 4:]
-            axes[1, 0].plot(args.dt * np.arange(len(pred_f)), np.linalg.norm(pred_f, axis=1), color=colors[i])
+                    # plot forces
+                    pred_f = pred[0, :, 4:]
+                    axes[1, 0].plot(args.dt * np.arange(len(pred_f)), np.linalg.norm(pred_f, axis=1), color=colors[i])
 
-            # plot controls
-            axes[1, 1].plot(args.dt * np.arange(len(pred_f)), np.linalg.norm(controls[0, :, :], axis=-1), color=colors[i])
+                    # plot controls
+                    axes[1, 1].plot(args.dt * np.arange(len(pred_f)), np.linalg.norm(controls[0, :, :], axis=-1), color=colors[i])
     axes[0,0].axis('off')
     axes[0,0].set_aspect('equal', 'box')
     axes[0,0].set_xticks([])
@@ -97,8 +99,8 @@ def plot_loss(l, outfile_name=None):
 
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
-DATADIR = "../data/point-mass-arm-with-feedback"
-RESULTDIR = "../results/point-mass-arm-with-feedback"
+DATADIR = "../data/point-mass-arm-with-feedback-noisy-reset-delay"
+RESULTDIR = "../results/point-mass-arm-with-feedback-noisy-reset-delay"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -114,7 +116,7 @@ net = NoisyNetWithFeedback(network_size=network_size, nonlinearity=args.nonlinea
                            delay=args.delay, feedback_type='position_only')
 
 # Use point-mass arm as effector
-net.effector = PointMassArm()
+net.effector = PointMassArm(reset_radius=args.reset_radius)
 
 # Define dataset and dataloader
 # dataset = HoldsDataset(n_targets=args.n_targets, total_duration=args.total_duration, dt=args.dt,
