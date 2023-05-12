@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--n_targets", type=int, help="number of targets", default=8)
 parser.add_argument("--dt", type=float, help="integration time step", default=0.01)
 parser.add_argument("--total_duration", type=float, help="total duration of the reach, including holding times", default=1.)
+parser.add_argument("--sigma", type=float, help="single-unit noise intensity", default=0.1)
 parser.add_argument("--noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=1.)
 parser.add_argument("--reset_radius", type=float, help="noise intensity for arm initial condition", default=0.005)
 parser.add_argument("--seed", type=str, help="seed", default=4)
@@ -35,7 +36,7 @@ parser.add_argument("--gamma_v", type=float, help="hyperparameter for end-veloci
 parser.add_argument("--gamma_f", type=float, help="hyperparameter for end-force loss", default=0.05)
 parser.add_argument("--lambda_ctrl", type=float, help="hyperparameter for control loss", default=0.05)  # was 0.05
 parser.add_argument("--lambda_rate", type=float, help="hyperparameter for rate loss", default=0.)
-parser.add_argument("--delay", type=int, help="hyperparameter for control loss", default=10)
+parser.add_argument("--delay", type=int, help="hyperparameter for control loss", default=0)
 parser.add_argument("--lr", type=float, help="learning rate", default=5e-4)
 parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(6, 100, 100, 2))
 args = parser.parse_args()
@@ -99,8 +100,8 @@ def plot_loss(l, outfile_name=None):
 
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
-DATADIR = "../data/point-mass-arm-with-feedback-noisy-reset-delay"
-RESULTDIR = "../results/point-mass-arm-with-feedback-noisy-reset-delay"
+DATADIR = "../data/point-mass-arm-with-feedback-noisy-reset-noisy"
+RESULTDIR = "../results/point-mass-arm-with-feedback-noisy-reset-noisy"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -113,7 +114,7 @@ torch.manual_seed(seed)
 # Define network
 network_size = args.size
 net = NoisyNetWithFeedback(network_size=network_size, nonlinearity=args.nonlinearity,
-                           delay=args.delay, feedback_type='position_only')
+                           delay=args.delay, feedback_type='position_only', sigma=args.sigma)
 
 # Use point-mass arm as effector
 net.effector = PointMassArm(reset_radius=args.reset_radius)

@@ -1,15 +1,19 @@
 import torch
 from sklearn.linear_model import LinearRegression
 import numpy as np
-
+import copy
 
 def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
+    dynamics_after_clda = None
+    dynamics_before_clda = None
     with torch.no_grad():
         for X, y in dataloader:
             h0 = noisy_ics * torch.rand((1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
             dyn, h, _ = net(X, h0)
+            dynamics_before_clda = copy.deepcopy(dyn)
     if clda > 0.:
         dyn = rotate_velocities(dyn, y)
+        dynamics_after_clda = dyn
     h = torch.reshape(h, (-1, h.size(2)))
     dyn = dyn[:, :, 2:4]  # only using the velocities
     dyn = torch.reshape(dyn, (-1, dyn.size(2)))
@@ -25,8 +29,10 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
 
     # print max activity for each readout
     #if clda < 1e-6:
-    #    print("Max activity = ", torch.max(h.detach()))
-    return T @ R
+        #print("Mean activity ", np.mean(R @ h.numpy().T, axis=1))
+        #print("Max activity ", np.max(R @ h.numpy().T, axis=1))
+        # print("Max activity = ", torch.max(h.detach()))
+    return T @ R, dynamics_before_clda, dynamics_after_clda
 
 
 def rotate_velocities(dynamics, targets):

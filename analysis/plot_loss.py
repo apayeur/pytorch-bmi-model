@@ -6,9 +6,9 @@ import os
 plt.style.use('../plot_params.dms')
 
 
-dir_name = "bci-with-feedback-noisy-reset-delay-cldastart0-cldastopFalse-cldafreq10-test"
+dir_name = "bci-with-feedback-noisy-reset-delay-cldastart0-cldastopFalse-cldafreq200-test"
 cldas = [0.0, 0.1]
-n_seeds = 1
+n_seeds = 10
 list_of_losses = []
 for seed in range(1, 1+n_seeds):
     for clda in cldas:

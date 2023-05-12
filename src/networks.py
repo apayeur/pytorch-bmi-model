@@ -151,15 +151,16 @@ class SimpleNet(nn.Module):
 
 
 class NoisyNet(SimpleNet):
-    def __init__(self, network_size=(5, 100, 200, 2), nonlinearity='relu'):
+    def __init__(self, network_size=(5, 100, 200, 2), nonlinearity='relu', sigma=5e-3):
         super().__init__(network_size, nonlinearity)
         self.motor_cortex = NoisyRNN(input_size=network_size[1], hidden_size=network_size[2],
-                                     nonlinearity='relu', batch_first=True)
+                                     nonlinearity='relu', batch_first=True, sigma=sigma)
 
 
 class NoisyNetWithFeedback(NoisyNet):
-    def __init__(self, network_size=(6, 100, 200, 2), nonlinearity='relu', delay=0, feedback_type='position_only', distance=0.07):
-        super().__init__(network_size, nonlinearity)
+    def __init__(self, network_size=(6, 100, 200, 2), nonlinearity='relu', delay=0, feedback_type='position_only',
+                 distance=0.07, sigma=5e-3):
+        super().__init__(network_size=network_size, nonlinearity=nonlinearity, sigma=sigma)
         self.delay = delay  # in time steps
         self.feedback_type = feedback_type
         self.distance = distance  # in meters, needed for proper normalization of position feedback
