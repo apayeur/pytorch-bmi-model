@@ -3,12 +3,14 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 import copy
 
+
 def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
     dynamics_after_clda = None
     dynamics_before_clda = None
     with torch.no_grad():
         for X, y in dataloader:
-            h0 = noisy_ics * torch.rand((1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
+            h0 = noisy_ics * torch.rand(
+                (1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
             dyn, h, _ = net(X, h0)
             dynamics_before_clda = copy.deepcopy(dyn)
     if clda > 0.:
@@ -28,25 +30,24 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
     R[range(n_readouts), range(n_readouts)] = 1.
 
     # print max activity for each readout
-    #if clda < 1e-6:
-        #print("Mean activity ", np.mean(R @ h.numpy().T, axis=1))
-        #print("Max activity ", np.max(R @ h.numpy().T, axis=1))
-        # print("Max activity = ", torch.max(h.detach()))
+    # if clda < 1e-6:
+    # print("Mean activity ", np.mean(R @ h.numpy().T, axis=1))
+    # print("Max activity ", np.max(R @ h.numpy().T, axis=1))
+    # print("Max activity = ", torch.max(h.detach()))
     return T @ R, dynamics_before_clda, dynamics_after_clda
 
 
 def rotate_velocities(dynamics, targets):
     workspace_dim = 2 if dynamics.shape[-1] == 6 else 3
 
-    speed = torch.linalg.vector_norm(dynamics[:, :, workspace_dim:2*workspace_dim], dim=-1, keepdim=True)
+    speed = torch.linalg.vector_norm(dynamics[:, :, workspace_dim:2 * workspace_dim], dim=-1, keepdim=True)
 
     target_positions = targets[:, :workspace_dim]
-    unit_vectors_towards_targets = (target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim])\
-                                   /torch.linalg.vector_norm(target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1, keepdim=True)
-    #print(torch.linalg.vector_norm(target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1))
-    #print(torch.linalg.vector_norm(target_positions.unsqueeze(1), dim=-1))
-    #print(torch.linalg.vector_norm( dynamics[:, :, :workspace_dim], dim=-1))
+    unit_vectors_towards_targets = (target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim]) / \
+                                   torch.linalg.vector_norm(
+                                       target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1,
+                                       keepdim=True)
 
-    dynamics[:, :, workspace_dim:2*workspace_dim] = speed * unit_vectors_towards_targets
+    dynamics[:, :, workspace_dim:2 * workspace_dim] = speed * unit_vectors_towards_targets
 
     return dynamics
