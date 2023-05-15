@@ -4,7 +4,7 @@ import numpy as np
 import copy
 
 
-def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
+def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, hold=0, clda=0.):
     dynamics_after_clda = None
     dynamics_before_clda = None
     with torch.no_grad():
@@ -14,7 +14,7 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
             dyn, h, _ = net(X, h0)
             dynamics_before_clda = copy.deepcopy(dyn)
     if clda > 0.:
-        dyn = rotate_velocities(dyn, y)
+        dyn = rotate_velocities(dyn, y, hold=hold)
         dynamics_after_clda = dyn
     h = torch.reshape(h, (-1, h.size(2)))
     dyn = dyn[:, :, 2:4]  # only using the velocities
@@ -37,10 +37,13 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, clda=0.):
     return T @ R, dynamics_before_clda, dynamics_after_clda
 
 
-def rotate_velocities(dynamics, targets):
+def rotate_velocities(dynamics, targets, hold=0):
     workspace_dim = 2 if dynamics.shape[-1] == 6 else 3
 
     speed = torch.linalg.vector_norm(dynamics[:, :, workspace_dim:2 * workspace_dim], dim=-1, keepdim=True)
+    if hold > 0:
+        speed[:, :hold] = 0.
+        speed[:, -hold:] = 0.
 
     target_positions = targets[:, :workspace_dim]
     unit_vectors_towards_targets = (target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim]) / \

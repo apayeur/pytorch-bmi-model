@@ -21,6 +21,7 @@ class GaussianVelocityDataset(Dataset):
         self.hold_end = hold_end  # in seconds
         self.sigma = sigma  # in seconds
         self.peak_velocity = self.distance / (2. * np.pi)**0.5 / sigma
+        assert context == 'arm' or context == 'bci', f"Context must be `arm` or `bci`, not {context}."
         self.context = context
 
     def __len__(self):
