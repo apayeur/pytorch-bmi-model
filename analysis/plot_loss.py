@@ -6,8 +6,8 @@ import os
 plt.style.use('../plot_params.dms')
 
 
-dir_name = "bci-with-feedback-noisy-reset-delay-cldastart0-cldastopFalse-cldafreq200-test"
-cldas = [0.0, 0.1]
+dir_name = "bci-with-feedback-noisy-reset-delay-holds-cldastart0-cldastopFalse-cldafreq100-adam"
+cldas = [0.0, 0.1, 0.2, 0.5]
 n_seeds = 10
 list_of_losses = []
 for seed in range(1, 1+n_seeds):
@@ -19,7 +19,7 @@ for seed in range(1, 1+n_seeds):
             print(f"File ../data/{dir_name}/loss_seed{seed}_clda{clda}.npy not found.")
 
 # Plot loss
-plot_loss(list_of_losses, os.path.join('../results', dir_name, 'Loss.png'), subsampling=100)
+plot_loss(list_of_losses, os.path.join('../results', dir_name, 'Loss.png'), subsampling=1, normalize=True)
 
 
 # Plot integrated differences between losses

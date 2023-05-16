@@ -4,8 +4,8 @@ import sys
 import os
 from networks import NoisyNetWithFeedback, NoisyNet
 from effectors import VelocityIntegrator
-from objectives import EndLoss
-from datasets import EndLossDataset
+from objectives import EndLoss, HoldsLoss
+from datasets import EndLossDataset, HoldsDataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from seaborn import despine
@@ -22,10 +22,10 @@ TODO: before learning as well
 """
 
 n_seeds = 1
-seeds = list(range(4, 4+n_seeds))
-cldas = [0.0, 0.1, 0.25]
+seeds = list(range(1, 1+n_seeds))
+cldas = [0.0]
 
-DIR = "bci-with-feedback-noisy-reset-delay-cldastart0-cldastopFalse-cldafreq100"
+DIR = "bci-with-feedback-noisy-reset-delay-holds-cldastart0-cldastopFalse-cldafreq100-adam"
 BCI_DATADIR = os.path.join("../data/", DIR)
 RESULTDIR = os.path.join("../results", DIR)
 if not os.path.exists(RESULTDIR):
@@ -41,7 +41,9 @@ for clda in cldas:
             # Load model and parameters
             params_manual = np.load(os.path.join(BCI_DATADIR, f"params_from_manual_seed{seed}_clda{clda}.npy"), allow_pickle=True).item()
             params_bci = np.load(os.path.join(BCI_DATADIR, f"params_seed{seed}_clda{clda}.npy"), allow_pickle=True).item()
-            net = NoisyNetWithFeedback(network_size=params_manual['size'], nonlinearity=params_manual['nonlinearity'], delay=params_manual['delay'])
+            sigma = params_manual['sigma'] if 'sigma' in params_manual.keys() else 5e-3
+            net = NoisyNetWithFeedback(network_size=params_manual['size'], nonlinearity=params_manual['nonlinearity'],
+                                       delay=params_manual['delay'], sigma=sigma)
             reset_radius = params_manual['reset_radius'] if 'reset_radius' in params_manual.keys() else 0.
             net.effector = VelocityIntegrator(reset_radius=reset_radius)
             net.load_state_dict(torch.load(os.path.join(BCI_DATADIR, f"model_seed{seed}_clda{clda}.pth")))
@@ -51,13 +53,30 @@ for clda in cldas:
             n_readouts = params_bci['n_readouts']
             D = copy.deepcopy(net.readout_layer.weight)
 
-            loss_fn = EndLoss(params_manual['gamma_v'], 0., 0., 0., params_manual['dt'])
-            dataset = EndLossDataset(n_targets=params_manual['n_targets'], total_duration=params_manual['total_duration'],
-                                     dt=params_manual['dt'],
-                                     distance=0.07, context='bci')
+            # Define dataset and dataloader
+            hold_duration = params_manual['hold_duration'] if 'hold_duration' in params_manual.keys() else 0
+            if hold_duration > 0:
+                dataset = HoldsDataset(n_targets=params_manual['n_targets'], total_duration=params_manual['total_duration'],
+                                       dt=params_manual['dt'],
+                                       distance=0.07, hold_start=params_manual['hold_duration'],
+                                       hold_end=params_manual['hold_duration'],
+                                       context='bci')
+            else:
+                dataset = EndLossDataset(n_targets=params_manual['n_targets'], total_duration=params_manual['total_duration'],
+                                         dt=params_manual['dt'],
+                                         distance=0.07, context='bci')
             dataloader = DataLoader(dataset, batch_size=params_manual['n_targets'])
+
+            # Define loss function
+            lambda_ctrl = 0.
+            if hold_duration > 0:
+                loss_fn = HoldsLoss(params_manual['gamma_v'], 0., lambda_ctrl, 0., hold_duration, hold_duration, params_manual['dt'])
+            else:
+                loss_fn = EndLoss(params_manual['gamma_v'], 0., lambda_ctrl, 0., params_manual['dt'])
+
             test_loss = np.empty(n_readouts)
 
+            # Single-unit ranking
             for readout_i in range(n_readouts):
                 net.readout_layer.weight.data = copy.deepcopy(D.data)
                 net.readout_layer.weight.data[:, :readout_i] = 0.

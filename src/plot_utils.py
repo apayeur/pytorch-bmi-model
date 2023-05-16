@@ -14,7 +14,7 @@ colors = [(200. / 255, 0, 0),  # red
                  (0.8, 0.6, 0.7)]  # pink
 
 
-def plot_loss(list_of_dicts, outfile_name=None, errorbar_type='sem', subsampling=1):
+def plot_loss(list_of_dicts, outfile_name=None, errorbar_type='sem', subsampling=1, normalize=False):
     """
     Plot loss.
 
@@ -27,30 +27,56 @@ def plot_loss(list_of_dicts, outfile_name=None, errorbar_type='sem', subsampling
 
     # Gather all the CLDA values in the list
     clda_values = set()
+    no_clda_data_exist = False
     for ld in list_of_dicts:
         for k in ld.keys():
+            if k < 1e-6:
+                no_clda_data_exist = True
             clda_values.add(k)
+    clda_values = np.sort(list(clda_values))
+
+    if not no_clda_data_exist and normalize:
+        normalize = False
+        print("No losses for CLDA=0, `normalize` set to `False`")
 
     losses = {clda: [] for clda in clda_values}
     for ld in list_of_dicts:
         for k, v in ld.items():
-            losses[k].append(v)
+            losses[k].append(np.log10(v))
+
+    if normalize:
+        if len(losses[clda_values[0]]) == 1:
+            min_, max_ = np.min(losses[clda_values[0]]), np.max(losses[clda_values[0]])
+        else:
+            min_, max_ = np.min(losses[clda_values[0]], axis=1, keepdims=True), np.max(losses[clda_values[0]], axis=1, keepdims=True)
+        for clda in clda_values:
+            if len(losses[clda]) == 1:
+                losses[clda] = (np.array(losses[clda]) - min_)/(max_ - min_)
+            else:
+                losses[clda] = (np.array(losses[clda]) - min_) / (max_ - min_)
 
     # Plot mean +/- error bar for each CLDA value
     for i, clda in enumerate(sorted(clda_values)):
-        mean_loss = np.mean(np.log10(losses[clda]), axis=0)[::subsampling]
+        mean_loss = np.mean(losses[clda], axis=0)[::subsampling]
         if errorbar_type == 'sem':
-            errorbar = np.std(np.log10(losses[clda]), axis=0, ddof=1) / len(losses[clda])**0.5
+            errorbar = np.std(losses[clda], axis=0, ddof=1) / len(losses[clda])**0.5
             errorbar = errorbar[::subsampling]
         elif errorbar == 'std':
-            errorbar = np.std(np.log10(losses[clda]), axis=0, ddof=1)
+            errorbar = np.std(losses[clda], axis=0, ddof=1)
             errorbar[::subsampling]
         plt.plot(np.arange(len(mean_loss)), mean_loss,
                      color='black' if clda < 1e-6 else colors[i], label=f"CLDA = {clda}", lw=0.5)
         plt.fill_between(np.arange(len(mean_loss)), mean_loss-errorbar, mean_loss+errorbar,
                          color='black' if clda < 1e-6 else colors[i], lw=0, alpha=0.5)
-    plt.xlabel("Epoch")
-    plt.ylabel("Log loss")
+    if subsampling > 1:
+        plt.xlabel(rf"Epochs ($\times${subsampling})")
+    else:
+        plt.xlabel("Epoch")
+
+    if normalize:
+        plt.ylabel("Relative log loss")
+    else:
+        plt.ylabel("Log loss")
     plt.legend(loc="upper right")
     despine()
     plt.tight_layout()
@@ -76,6 +102,20 @@ def plot_trajectories(ax, net, dataset, noise_for_hidden_init, n_reals=5):
     ax.set_aspect('equal', 'box')
     ax.set_xticks([])
     ax.set_yticks([])
+
+
+def plot_speeds(ax, net, dataset, noise_for_hidden_init, n_reals=5):
+    colors = color_palette('colorblind', dataset.n_targets)
+    with torch.no_grad():
+        for _ in range(n_reals):
+            for i in range(dataset.n_targets):
+                pred, _, _ = net(dataset[i][0].unsqueeze(0), noise_for_hidden_init * torch.rand((1, 1, net.network_size[2])))
+                speeds = torch.linalg.vector_norm(pred[0, :, 2:4], dim=-1)
+                ax.plot(dataset.dt * np.arange(speeds.size(0)), speeds, color=colors[i])
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Speed [m/s]")
+    despine(ax=ax)
+
 
 
 def plot_single_loss(l, outfile_name=None):

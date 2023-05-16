@@ -4,26 +4,26 @@ import sys
 import numpy as np
 from torch.utils.data import DataLoader
 sys.path.append("../src")
-from datasets import EndLossDataset
+from datasets import EndLossDataset, HoldsDataset
 from effectors import PointMassArm, VelocityIntegrator
 import matplotlib.pyplot as plt
-from plot_utils import units_convert, plot_trajectories, plot_single_loss, colors
+from plot_utils import units_convert, plot_trajectories, plot_single_loss, colors, plot_speeds
 from networks import NoisyNetWithFeedback, NoisyNet
 from decode import build_bci_decoder
-from objectives import EndLoss
+from objectives import EndLoss, HoldsLoss
 import argparse
 plt.style.use('../plot_params.dms')
 
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
-parser.add_argument("--seed", type=str, help="seed", default=4)
+parser.add_argument("--seed", type=str, help="seed", default=1)
 parser.add_argument("--clda_frequency", type=int,
-                    help="frequency with which to perform CLDA, in number of epochs", default=500)
+                    help="frequency with which to perform CLDA, in number of epochs", default=100)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
 parser.add_argument("--clda_stop", type=int, help="epoch ID to stop CLDA at", default=1e9)
 parser.add_argument("--clda", type=float,
-                    help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.5)
+                    help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.1)
 args = parser.parse_args()
 
 # CLDA parameters
@@ -33,7 +33,7 @@ clda = args.clda
 
 # Load data
 seed = args.seed
-MANUAL_DATADIR = "../data/point-mass-arm-with-feedback-noisy-reset-noisy"
+MANUAL_DATADIR = "../data/point-mass-arm-with-feedback-noisy-reset-noisy-holds"
 params = np.load(os.path.join(MANUAL_DATADIR, f"params_seed{seed}.npy"), allow_pickle=True).item()
 
 sigma = params['sigma'] if 'sigma' in params.keys() else 5e-3
@@ -50,22 +50,33 @@ torch.manual_seed(seed)
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
 stop = args.clda_stop if args.clda_stop < 1e6 else False
-DATADIR = f"../data/bci-with-feedback-noisy-reset-delay-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-test2"
-RESULTDIR = f"../results/bci-with-feedback-noisy-reset-delay-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-test2"
+DATADIR = f"../data/bci-with-feedback-noisy-reset-delay-holds-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
+RESULTDIR = f"../results/bci-with-feedback-noisy-reset-delay-holds-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
     os.makedirs(RESULTDIR)
 
 # Dataset and dataloader for manual data for decoder fitting
-dataset = EndLossDataset(n_targets=params['n_targets'], total_duration=params['total_duration'], dt=params['dt'],
-                         distance=0.07, context='arm')
+hold_duration = params['hold_duration'] if 'hold_duration' in params.keys() else 0
+if hold_duration > 0:
+    dataset = HoldsDataset(n_targets=params['n_targets'], total_duration=params['total_duration'], dt=params['dt'],
+                           distance=0.07, hold_start=params['hold_duration'], hold_end=params['hold_duration'],
+                           context='arm')
+else:
+    dataset = EndLossDataset(n_targets=params['n_targets'], total_duration=params['total_duration'], dt=params['dt'],
+                             distance=0.07, context='arm')
 dataloader = DataLoader(dataset, batch_size=params['n_targets'])
 D, _, _ = build_bci_decoder(net, dataloader, params['noisy_ics'], n_readouts=args.n_readouts, clda=0.)  # clda = 0. always here
 
 # Dataset and dataloader for bci context and training
-dataset = EndLossDataset(n_targets=params['n_targets'], total_duration=params['total_duration'], dt=params['dt'],
-                         distance=0.07, context='bci')
+if hold_duration > 0:
+    dataset = HoldsDataset(n_targets=params['n_targets'], total_duration=params['total_duration'], dt=params['dt'],
+                           distance=0.07, hold_start=params['hold_duration'], hold_end=params['hold_duration'],
+                           context='bci')
+else:
+    dataset = EndLossDataset(n_targets=params['n_targets'], total_duration=params['total_duration'], dt=params['dt'],
+                             distance=0.07, context='bci')
 dataloader = DataLoader(dataset, batch_size=params['n_targets'])
 net.readout_layer.weight.data = torch.from_numpy(D)     # attach decoder to network
 net.effector = VelocityIntegrator(reset_radius=reset_radius)                     # remove the arm
@@ -74,13 +85,21 @@ net.effector = VelocityIntegrator(reset_radius=reset_radius)                    
 _, ax = plt.subplots(figsize=(45*units_convert['mm'], 45*units_convert['mm']))
 plot_trajectories(ax, net, dataset, params['noisy_ics'])
 plt.savefig(os.path.join(RESULTDIR, f"BCITrajectoriesBeforeLearning_seed{seed}_clda{clda}.png"))
+
+_, ax = plt.subplots(figsize=(45*units_convert['mm'], 45/1.25*units_convert['mm']))
+plot_speeds(ax, net, dataset, params['noisy_ics'])
+plt.tight_layout()
+plt.savefig(os.path.join(RESULTDIR, f"BCISpeedsBeforeLearning_seed{seed}_clda{clda}.png"))
 plt.close()
 
 # Training under BCI control
-epochs = 3000
+epochs = 1000
 lambda_ctrl = 0.
-loss_fn = EndLoss(params['gamma_v'], 0., lambda_ctrl, 0., params['dt'])
-optimizer = torch.optim.SGD(net.parameters(), lr=1e-4)  # was 1e-4
+if hold_duration > 0:
+    loss_fn = HoldsLoss(params['gamma_v'], 0., lambda_ctrl, 0., hold_duration, hold_duration, params['dt'])
+else:
+    loss_fn = EndLoss(params['gamma_v'], 0., lambda_ctrl, 0., params['dt'])
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)  # was 1e-4
 optimizer.zero_grad()
 next_CLDA = clda_start
 losses = []
@@ -88,7 +107,7 @@ for t in range(epochs):
     # CLDA: we do it even when clda=0, to match random number generations across clda values
     if t == next_CLDA and t < args.clda_stop:
         D_new, dyn_bef, dyn_aft = build_bci_decoder(net, dataloader, params['noisy_ics'], n_readouts=args.n_readouts,
-                                  clda=args.clda)
+                                  clda=args.clda, hold=int(hold_duration / params['dt']))
         D = clda * D_new + (1 - clda) * D
         net.readout_layer.weight.data = torch.from_numpy(D)
         next_CLDA += clda_frequency
@@ -131,6 +150,12 @@ plot_single_loss(losses, os.path.join(RESULTDIR, f"Loss_seed{seed}_clda{clda}.pn
 _, ax = plt.subplots(figsize=(45*units_convert['mm'], 45*units_convert['mm']))
 plot_trajectories(ax, net, dataset, params['noisy_ics'])
 plt.savefig(os.path.join(RESULTDIR, f"BCITrajectoriesAfterLearning_seed{seed}_clda{clda}.png"))
+
+_, ax = plt.subplots(figsize=(45*units_convert['mm'], 45/1.25*units_convert['mm']))
+plot_speeds(ax, net, dataset, params['noisy_ics'])
+plt.tight_layout()
+plt.savefig(os.path.join(RESULTDIR, f"BCISpeedsAfterLearning_seed{seed}_clda{clda}.png"))
+plt.close()
 
 # Saving
 torch.save(net.state_dict(), os.path.join(DATADIR, f"model_seed{seed}_clda{clda}.pth"))    # model parameters

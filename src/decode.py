@@ -41,14 +41,21 @@ def rotate_velocities(dynamics, targets, hold=0):
     workspace_dim = 2 if dynamics.shape[-1] == 6 else 3
 
     speed = torch.linalg.vector_norm(dynamics[:, :, workspace_dim:2 * workspace_dim], dim=-1, keepdim=True)
-    if hold > 0:
-        speed[:, :hold] = 0.
-        speed[:, -hold:] = 0.
+    #if hold > 0:
+    #    speed[:, :hold] = 0.
+    #    speed[:, -hold:] = 0.
 
     target_positions = targets[:, :workspace_dim]
     unit_vectors_towards_targets = (target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim]) / \
                                    torch.linalg.vector_norm(
                                        target_positions.unsqueeze(1) - dynamics[:, :, :workspace_dim], dim=-1,
+                                       keepdim=True)
+
+    if hold > 0:
+        center_position = torch.zeros_like(target_positions)
+        unit_vectors_towards_targets[:, :hold, :] = (center_position.unsqueeze(1) - dynamics[:, :hold, :workspace_dim]) / \
+                                   torch.linalg.vector_norm(
+                                       center_position.unsqueeze(1) - dynamics[:, :hold, :workspace_dim], dim=-1,
                                        keepdim=True)
 
     dynamics[:, :, workspace_dim:2 * workspace_dim] = speed * unit_vectors_towards_targets
