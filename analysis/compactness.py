@@ -21,11 +21,11 @@ Analyze compactness in the model after learning.
 TODO: before learning as well
 """
 
-n_seeds = 1
+n_seeds = 5
 seeds = list(range(1, 1+n_seeds))
-cldas = [0.0]
+cldas = [0.0, 0.1, 0.2, 0.5]
 
-DIR = "bci-with-feedback-noisy-reset-delay-holds-cldastart0-cldastopFalse-cldafreq100-adam"
+DIR = "bci-with-feedback-velocity-cldastart0-cldastopFalse-cldafreq100-adam"
 BCI_DATADIR = os.path.join("../data/", DIR)
 RESULTDIR = os.path.join("../results", DIR)
 if not os.path.exists(RESULTDIR):
@@ -43,7 +43,7 @@ for clda in cldas:
             params_bci = np.load(os.path.join(BCI_DATADIR, f"params_seed{seed}_clda{clda}.npy"), allow_pickle=True).item()
             sigma = params_manual['sigma'] if 'sigma' in params_manual.keys() else 5e-3
             net = NoisyNetWithFeedback(network_size=params_manual['size'], nonlinearity=params_manual['nonlinearity'],
-                                       delay=params_manual['delay'], sigma=sigma)
+                                       delay=params_manual['delay'], feedback_type='position_and_velocity', sigma=sigma)
             reset_radius = params_manual['reset_radius'] if 'reset_radius' in params_manual.keys() else 0.
             net.effector = VelocityIntegrator(reset_radius=reset_radius)
             net.load_state_dict(torch.load(os.path.join(BCI_DATADIR, f"model_seed{seed}_clda{clda}.pth")))
@@ -115,12 +115,12 @@ for j, clda in enumerate(cldas):
     np.arange(1, 1 + n_readouts)
     plt.errorbar(np.arange(1, 1 + n_readouts), m, yerr=sem,
                  color='black' if clda < 1e-6 else colors[j], label=f"CLDA = {clda}")
-plt.ylabel("Log loss")
+plt.ylabel("Log$_{10}$ loss")
 plt.xlabel("Ranked readout unit")
 plt.legend()
 plt.tight_layout()
 despine()
-plt.show()
+plt.savefig(os.path.join(RESULTDIR, 'RankedSingleUnitLoss.png'))
 
 # Plot ranked UAC
 plt.figure(figsize=(45 * units_convert['mm'], 45 / 1.25 * units_convert['mm']))
@@ -129,9 +129,9 @@ for j, clda in enumerate(cldas):
     sem = np.std(np.log10(ranked_uac[clda]), axis=0, ddof=1) / len(ranked_uac[clda])**0.5
     plt.errorbar(np.arange(1, 1 + n_readouts), m, yerr=sem,
                  color='black' if clda < 1e-6 else colors[j], label=f"CLDA = {clda}")
-plt.ylabel("Log loss")
+plt.ylabel("Log$_{10}$ loss")
 plt.xlabel("Ranked readout unit")
 plt.legend()
 plt.tight_layout()
 despine()
-plt.show()
+plt.savefig(os.path.join(RESULTDIR, 'RankedUAC.png'))

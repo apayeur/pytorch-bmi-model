@@ -30,10 +30,10 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, hold=0, clda=0.
     R[range(n_readouts), range(n_readouts)] = 1.
 
     # print max activity for each readout
-    # if clda < 1e-6:
-    # print("Mean activity ", np.mean(R @ h.numpy().T, axis=1))
-    # print("Max activity ", np.max(R @ h.numpy().T, axis=1))
-    # print("Max activity = ", torch.max(h.detach()))
+    #if clda < 1e-6:
+    #    print("Mean activity ", np.mean(R @ h.numpy().T, axis=1))
+    #    print("Max activity ", np.max(R @ h.numpy().T, axis=1))
+    #    print("Max activity = ", torch.max(h.detach()))
     return T @ R, dynamics_before_clda, dynamics_after_clda
 
 

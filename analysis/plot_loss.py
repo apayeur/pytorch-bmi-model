@@ -6,9 +6,9 @@ import os
 plt.style.use('../plot_params.dms')
 
 
-dir_name = "bci-with-feedback-noisy-reset-delay-holds-cldastart0-cldastopFalse-cldafreq100-adam"
+dir_name = "bci-with-feedback-velocity-cldastart0-cldastop100-cldafreq10-adam"
 cldas = [0.0, 0.1, 0.2, 0.5]
-n_seeds = 10
+n_seeds = 5
 list_of_losses = []
 for seed in range(1, 1+n_seeds):
     for clda in cldas:
@@ -52,7 +52,7 @@ for i, clda in enumerate(sorted(cldas[1:])):
                      color='black' if clda < 1e-6 else colors[i], lw=0, alpha=0.5)
 plt.plot(np.arange(len(mean_loss)), np.zeros(len(mean_loss)), ':', color='grey')
 plt.xlabel("Epoch")
-plt.ylabel("Integrated difference\nof log losses")
+plt.ylabel("Integrated difference\nof log$_{10}$ losses")
 plt.legend()
 despine()
 plt.tight_layout()

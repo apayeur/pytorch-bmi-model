@@ -74,9 +74,9 @@ def plot_loss(list_of_dicts, outfile_name=None, errorbar_type='sem', subsampling
         plt.xlabel("Epoch")
 
     if normalize:
-        plt.ylabel("Relative log loss")
+        plt.ylabel("Relative log$_{10}$ loss")
     else:
-        plt.ylabel("Log loss")
+        plt.ylabel("Log$_{10}$ loss")
     plt.legend(loc="upper right")
     despine()
     plt.tight_layout()

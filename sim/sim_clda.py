@@ -17,11 +17,11 @@ plt.style.use('../plot_params.dms')
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
-parser.add_argument("--seed", type=str, help="seed", default=1)
+parser.add_argument("--seed", type=str, help="seed", default=2)
 parser.add_argument("--clda_frequency", type=int,
-                    help="frequency with which to perform CLDA, in number of epochs", default=100)
+                    help="frequency with which to perform CLDA, in number of epochs", default=10)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
-parser.add_argument("--clda_stop", type=int, help="epoch ID to stop CLDA at", default=1e9)
+parser.add_argument("--clda_stop", type=int, help="epoch ID to stop CLDA at", default=100)
 parser.add_argument("--clda", type=float,
                     help="intensity of CLDA (= 1. - alpha_CLDA, according to my older notation)", default=0.1)
 args = parser.parse_args()
@@ -33,12 +33,12 @@ clda = args.clda
 
 # Load data
 seed = args.seed
-MANUAL_DATADIR = "../data/point-mass-arm-with-feedback-noisy-reset-noisy-holds"
+MANUAL_DATADIR = "../data/point-mass-arm-with-feedback-velocity"
 params = np.load(os.path.join(MANUAL_DATADIR, f"params_seed{seed}.npy"), allow_pickle=True).item()
 
 sigma = params['sigma'] if 'sigma' in params.keys() else 5e-3
 net = NoisyNetWithFeedback(network_size=params['size'], nonlinearity=params['nonlinearity'],
-                           delay=params['delay'], sigma=sigma)
+                           delay=params['delay'], sigma=sigma, feedback_type='position_and_velocity')
 #net = NoisyNet(network_size=params['size'], nonlinearity=params['nonlinearity'])
 reset_radius = params['reset_radius'] if 'reset_radius' in params.keys() else 0.
 net.effector = PointMassArm(reset_radius=reset_radius)  # must add point-mass arm before loading
@@ -50,8 +50,8 @@ torch.manual_seed(seed)
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
 stop = args.clda_stop if args.clda_stop < 1e6 else False
-DATADIR = f"../data/bci-with-feedback-noisy-reset-delay-holds-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
-RESULTDIR = f"../results/bci-with-feedback-noisy-reset-delay-holds-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
+DATADIR = f"../data/bci-with-feedback-velocity-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
+RESULTDIR = f"../results/bci-with-feedback-velocity-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -93,7 +93,7 @@ plt.savefig(os.path.join(RESULTDIR, f"BCISpeedsBeforeLearning_seed{seed}_clda{cl
 plt.close()
 
 # Training under BCI control
-epochs = 1000
+epochs = 2000
 lambda_ctrl = 0.
 if hold_duration > 0:
     loss_fn = HoldsLoss(params['gamma_v'], 0., lambda_ctrl, 0., hold_duration, hold_duration, params['dt'])
@@ -114,17 +114,19 @@ for t in range(epochs):
 
         # TMP: plot rotated velocities
         '''
-        targets = [[0.07*np.cos(2*np.pi*i/params['n_targets']), 0.07*np.sin(2*np.pi*i/params['n_targets'])] for i in range(params['n_targets'])]
-        interval_quiver = 10
-        for i in range(params['n_targets']):
-            plt.quiver(dyn_bef[i, ::interval_quiver, 0], dyn_bef[i, ::interval_quiver, 1],
-                       dyn_bef[i, ::interval_quiver, 2], dyn_bef[i, ::interval_quiver, 3], color=colors[i], alpha=0.5)
-            plt.quiver(dyn_aft[i, ::interval_quiver, 0], dyn_aft[i, ::interval_quiver, 1],
-                       dyn_aft[i, ::interval_quiver, 2], dyn_aft[i, ::interval_quiver, 3], color=colors[i])
-            plt.plot(targets[i][0], targets[i][1], color=colors[i], marker='o', markersize=3, lw=0.)
-        plt.gca().set_aspect('equal')
-        plt.gca().axis('off')
-        plt.show()
+        if t == 5*clda_frequency:
+            plt.close()
+            targets = [[0.07*np.cos(2*np.pi*i/params['n_targets']), 0.07*np.sin(2*np.pi*i/params['n_targets'])] for i in range(params['n_targets'])]
+            interval_quiver = 10
+            for i in range(params['n_targets']):
+                plt.quiver(dyn_bef[i, ::interval_quiver, 0], dyn_bef[i, ::interval_quiver, 1],
+                           dyn_bef[i, ::interval_quiver, 2], dyn_bef[i, ::interval_quiver, 3], color=colors[i], alpha=0.5)
+                plt.quiver(dyn_aft[i, ::interval_quiver, 0], dyn_aft[i, ::interval_quiver, 1],
+                           dyn_aft[i, ::interval_quiver, 2], dyn_aft[i, ::interval_quiver, 3], color=colors[i])
+                plt.plot(targets[i][0], targets[i][1], color=colors[i], marker='o', markersize=3, lw=0.)
+            plt.gca().set_aspect('equal')
+            plt.gca().axis('off')
+            plt.show()
         '''
     for X, y in dataloader:
         # Prediction
