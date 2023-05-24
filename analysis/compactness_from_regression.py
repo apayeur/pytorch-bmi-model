@@ -45,7 +45,7 @@ def piecewise_aggregate_approximation(activity, window_size=10):
     assert n_timebins % window_size == 0, "`n_timebins` must be an integer multiple of `window_size`"
     paa_activity = np.empty((n_targets, n_timebins//window_size, n_units))
 
-    paa = PiecewiseAggregateApproximation(window_size=10)
+    paa = PiecewiseAggregateApproximation(window_size=window_size)
     for i in range(n_targets):
         X_transformed = paa.transform(activity[i].T)
         paa_activity[i] = X_transformed.T
@@ -86,14 +86,11 @@ def convert_target_position_to_id(targets, nb_of_ids=8):
     return target_ids
 
 
-
-
-
 n_seeds = 1
 seeds = list(range(1, 1+n_seeds))
-cldas = [0.0]  # [0.0, 0.1, 0.2, 0.5]
+cldas = [0.5]  # [0.0, 0.1, 0.2, 0.5]
 
-n_reals = 10  # number of realizations to use
+n_reals = 7  # number of realizations to use
 bin_width = 0.1
 
 DIR = "bci-with-feedback-velocity-cldastart0-cldastopFalse-cldafreq100-adam"
@@ -146,12 +143,11 @@ for clda in cldas:
                 T = np.empty((n_reals, dataloader.batch_size), dtype=int)
                 for r in range(n_reals):
                     for X, y in dataloader:
-                        print(y.shape)
                         h0 = params_manual['noisy_ics'] * torch.rand(
                             (1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
                         pred, h, controls = net(X, h0)
                         h = h.numpy()
-                        H[r] = piecewise_aggregate_approximation(h[:, :, :n_readouts])
+                        H[r] = piecewise_aggregate_approximation(h[:, :, :n_readouts], window_size=window_size)
                         T[r] = convert_target_position_to_id(y.numpy(), params_manual['n_targets'])
 
             # Construct dataset for skfolds
@@ -164,7 +160,7 @@ for clda in cldas:
                     Y_fold[sample_count] = T[r, t]
                     sample_count += 1
 
-            skfolds = StratifiedKFold(n_splits=5)
+            skfolds = StratifiedKFold(n_splits=2)
             for train_index, test_index in skfolds.split(X_fold, Y_fold):
                 # Single-unit ranking
                 scores = []
@@ -180,7 +176,7 @@ for clda in cldas:
                     X_train, Y_train = X[train_index], Y[train_index]
                     X_test, Y_test = X[test_index], Y[test_index]
 
-                    log_reg = LogisticRegression(solver='lbfgs')
+                    log_reg = LogisticRegression(solver='lbfgs', max_iter=1000)
                     log_reg.fit(X_train, Y_train)
                     scores.append(log_reg.score(X_test, Y_test))
 
