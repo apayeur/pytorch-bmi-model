@@ -83,7 +83,7 @@ for clda in cldas:
                 net.readout_layer.weight.data[:, readout_i+1:] = 0.
                 with torch.no_grad():
                     for X, y in dataloader:
-                        h0 = params_manual['noisy_ics'] * torch.rand(
+                        h0 = params_manual['noisy_ics'] * torch.randn(
                             (1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
                         pred, h, controls = net(X, h0)
                         test_loss[readout_i], _, _ = loss_fn(pred, y.unsqueeze(1), controls, h)
@@ -98,7 +98,7 @@ for clda in cldas:
                 net.readout_layer.weight.data[:, ranked_readout_i] = D.data[:, ranked_readout_i]
                 with torch.no_grad():
                     for X, y in dataloader:
-                        h0 = params_manual['noisy_ics'] * torch.rand(
+                        h0 = params_manual['noisy_ics'] * torch.randn(
                             (1, dataloader.batch_size, net.network_size[2]))
                         pred, h, controls = net(X, h0)
                         test_loss[i], _, _ = loss_fn(pred, y.unsqueeze(1), controls, h)

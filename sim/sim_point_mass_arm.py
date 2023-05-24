@@ -43,7 +43,7 @@ def plot_trajectories(net, dataset, outfile_name=None):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(2*45*units_convert['mm'], 2*45/1.25*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
+        pred, _, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.randn((1, 1, net.network_size[2])))
         pred = pred.detach().numpy()
         controls = controls.detach().numpy()
         pred_traj = pred[0, :, :2]
@@ -130,7 +130,7 @@ losses = []
 for t in range(epochs):
     for X, y in dataloader:
         # Prediction
-        v0 = args.noisy_ics*torch.rand((1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
+        v0 = args.noisy_ics*torch.randn((1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
         pred, _, controls = net(X, v0)
 
         # Loss

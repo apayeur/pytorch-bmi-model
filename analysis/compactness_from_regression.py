@@ -88,12 +88,12 @@ def convert_target_position_to_id(targets, nb_of_ids=8):
 
 n_seeds = 1
 seeds = list(range(1, 1+n_seeds))
-cldas = [0.5]  # [0.0, 0.1, 0.2, 0.5]
+cldas = [0.0]  # [0.0, 0.1, 0.2, 0.5]
 
-n_reals = 7  # number of realizations to use
+n_reals = 30  # number of realizations to use
 bin_width = 0.1
 
-DIR = "bci-with-feedback-velocity-cldastart0-cldastopFalse-cldafreq100-adam"
+DIR = "bci-with-feedback-high-noise-cldastart0-cldastop100-cldafreq10-adam"
 BCI_DATADIR = os.path.join("../data/", DIR)
 RESULTDIR = os.path.join("../results", DIR)
 if not os.path.exists(RESULTDIR):
@@ -111,7 +111,7 @@ for clda in cldas:
             params_bci = np.load(os.path.join(BCI_DATADIR, f"params_seed{seed}_clda{clda}.npy"), allow_pickle=True).item()
             sigma = params_manual['sigma'] if 'sigma' in params_manual.keys() else 5e-3
             net = NoisyNetWithFeedback(network_size=params_manual['size'], nonlinearity=params_manual['nonlinearity'],
-                                       delay=params_manual['delay'], feedback_type='position_and_velocity', sigma=sigma)
+                                       delay=params_manual['delay'], feedback_type=params_manual['feedback_type'], sigma=sigma)
             reset_radius = params_manual['reset_radius'] if 'reset_radius' in params_manual.keys() else 0.
             net.effector = VelocityIntegrator(reset_radius=reset_radius)
             net.load_state_dict(torch.load(os.path.join(BCI_DATADIR, f"model_seed{seed}_clda{clda}.pth")))
@@ -143,7 +143,7 @@ for clda in cldas:
                 T = np.empty((n_reals, dataloader.batch_size), dtype=int)
                 for r in range(n_reals):
                     for X, y in dataloader:
-                        h0 = params_manual['noisy_ics'] * torch.rand(
+                        h0 = params_manual['noisy_ics'] * torch.randn(
                             (1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
                         pred, h, controls = net(X, h0)
                         h = h.numpy()
@@ -176,7 +176,7 @@ for clda in cldas:
                     X_train, Y_train = X[train_index], Y[train_index]
                     X_test, Y_test = X[test_index], Y[test_index]
 
-                    log_reg = LogisticRegression(solver='lbfgs', max_iter=1000)
+                    log_reg = LogisticRegression(solver='lbfgs', max_iter=5000)
                     log_reg.fit(X_train, Y_train)
                     scores.append(log_reg.score(X_test, Y_test))
 
@@ -208,7 +208,7 @@ for clda in cldas:
                 net.readout_layer.weight.data[:, ranked_readout_i] = D.data[:, ranked_readout_i]
                 with torch.no_grad():
                     for X, y in dataloader:
-                        h0 = params_manual['noisy_ics'] * torch.rand(
+                        h0 = params_manual['noisy_ics'] * torch.randn(
                             (1, dataloader.batch_size, net.network_size[2]))
                         pred, h, controls = net(X, h0)
                         test_loss[i], _, _ = loss_fn(pred, y.unsqueeze(1), controls, h)

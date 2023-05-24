@@ -56,7 +56,7 @@ def plot_trajectories(net, dataset, outfile_name=None, n_reals=5):
         for _ in range(n_reals):
             for i in range(dataset.n_targets):
                 pred, h, controls = net(dataset[i][0].unsqueeze(0),
-                                        args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
+                                        args.noisy_ics * torch.randn((1, 1, net.network_size[2])))
                 pred = pred.detach().numpy()
                 controls = controls.detach().numpy()
                 pred_traj = pred[0, :, :2]
@@ -149,7 +149,7 @@ losses = []
 for t in range(epochs):
     for X, y in dataloader:
         # Prediction
-        v0 = args.noisy_ics * torch.rand(
+        v0 = args.noisy_ics * torch.randn(
             (1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
         pred, h, controls = net(X, v0)
 
@@ -168,7 +168,7 @@ for t in range(epochs):
 
 with torch.no_grad():
     for X, y in dataloader:
-        pred, h, ctrls = net(X, args.noisy_ics * torch.rand((1, dataloader.batch_size, net.network_size[2])))
+        pred, h, ctrls = net(X, args.noisy_ics * torch.randn((1, dataloader.batch_size, net.network_size[2])))
         print(torch.max(h))
 
 # Plot some results

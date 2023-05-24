@@ -50,7 +50,7 @@ def plot_trajectories(net, dataset, network_size, outfile_name):
     fig, ax = plt.subplots(ncols=1, figsize=(45*units_convert['mm'], 45*units_convert['mm']))
     colors = color_palette('colorblind', dataset.n_targets)
     for i in range(dataset.n_targets):
-        pred, _, _ = net(dataset[i][0], NOISE_FOR_HIDDEN_INIT * torch.rand((1, network_size[2])))
+        pred, _, _ = net(dataset[i][0], NOISE_FOR_HIDDEN_INIT * torch.randn((1, network_size[2])))
         pred = pred.detach().numpy()
         pred_traj = dataset.dt * np.cumsum(pred, axis=0)
         target_vel = dataset[i][1].detach().numpy()
@@ -69,7 +69,7 @@ def plot_trajectories(net, dataset, network_size, outfile_name):
 def build_bci_decoder(net, dataloader, network_size, n_readouts=10, clda=0.):
     with torch.no_grad():
         for X, y in dataloader:
-            h0 = NOISE_FOR_HIDDEN_INIT * torch.rand(
+            h0 = NOISE_FOR_HIDDEN_INIT * torch.randn(
                 (1, 8, network_size[2]))  # set of initial conditions for motor cortex
             pred, h, _ = net(X, h0)
             if clda > 0.:
@@ -117,7 +117,7 @@ epochs = 3000
 for t in range(epochs):
     for X, y in dataloader:
         # Compute prediction and loss
-        h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
+        h0 = NOISE_FOR_HIDDEN_INIT*torch.randn((1, 8, network_size[2]))  # set of initial conditions for motor cortex
         pred, _, _ = net(X, h0)
         loss = loss_fn(pred, y)
 
@@ -145,7 +145,7 @@ dataset = GaussianVelocityDataset(n_targets=args.n_targets, total_duration=args.
 dataloader = DataLoader(dataset, batch_size=args.n_targets)
 with torch.no_grad():
     for X, y in dataloader:
-        h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))
+        h0 = NOISE_FOR_HIDDEN_INIT*torch.randn((1, 8, network_size[2]))
         pred, _, _ = net(X, h0)
 
 plot_trajectories(net, dataset, network_size, "BCIControlTrajectories_BeforeLearning.png")
@@ -161,7 +161,7 @@ losses = []
 for t in range(epochs):
     for X, y in dataloader:
         # Compute prediction and loss
-        h0 = NOISE_FOR_HIDDEN_INIT*torch.rand((1, 8, network_size[2]))  # set of initial conditions for motor cortex
+        h0 = NOISE_FOR_HIDDEN_INIT*torch.randn((1, 8, network_size[2]))  # set of initial conditions for motor cortex
         pred, _, _ = net(X, h0)
         loss = loss_fn(pred, y)
         losses.append(loss.item())

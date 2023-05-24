@@ -17,7 +17,7 @@ plt.style.use('../plot_params.dms')
 # Arguments parsing
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_readouts", type=int, help="number of readout units", default=10)
-parser.add_argument("--seed", type=str, help="seed", default=2)
+parser.add_argument("--seed", type=str, help="seed", default=1)
 parser.add_argument("--clda_frequency", type=int,
                     help="frequency with which to perform CLDA, in number of epochs", default=10)
 parser.add_argument("--clda_start", type=int, help="epoch ID to start CLDA at", default=0)
@@ -33,12 +33,12 @@ clda = args.clda
 
 # Load data
 seed = args.seed
-MANUAL_DATADIR = "../data/point-mass-arm-with-feedback-velocity"
+MANUAL_DATADIR = "../data/point-mass-arm-with-feedback-high-noise"
 params = np.load(os.path.join(MANUAL_DATADIR, f"params_seed{seed}.npy"), allow_pickle=True).item()
 
 sigma = params['sigma'] if 'sigma' in params.keys() else 5e-3
 net = NoisyNetWithFeedback(network_size=params['size'], nonlinearity=params['nonlinearity'],
-                           delay=params['delay'], sigma=sigma, feedback_type='position_and_velocity')
+                           delay=params['delay'], sigma=sigma, feedback_type=params['feedback_type'])
 #net = NoisyNet(network_size=params['size'], nonlinearity=params['nonlinearity'])
 reset_radius = params['reset_radius'] if 'reset_radius' in params.keys() else 0.
 net.effector = PointMassArm(reset_radius=reset_radius)  # must add point-mass arm before loading
@@ -50,8 +50,8 @@ torch.manual_seed(seed)
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
 stop = args.clda_stop if args.clda_stop < 1e6 else False
-DATADIR = f"../data/bci-with-feedback-velocity-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
-RESULTDIR = f"../results/bci-with-feedback-velocity-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
+DATADIR = f"../data/bci-with-feedback-high-noise-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
+RESULTDIR = f"../results/bci-with-feedback-high-noise-cldastart{args.clda_start}-cldastop{stop}-cldafreq{args.clda_frequency}-adam"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -130,7 +130,7 @@ for t in range(epochs):
         '''
     for X, y in dataloader:
         # Prediction
-        v0 = params['noisy_ics']* torch.rand(
+        v0 = params['noisy_ics']* torch.randn(
             (1, params['n_targets'], net.network_size[2]))  # set of initial conditions for motor cortex
         pred, h, controls = net(X, v0)
 
