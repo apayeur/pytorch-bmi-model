@@ -137,7 +137,6 @@ optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
 epochs = 5000
 plot_trajectories(net, dataset, os.path.join(RESULTDIR, f"ManualControlTrajectoriesBeforeLearning_seed{seed}.png"))
 losses = []
-
 for t in range(epochs):
     for X, y in dataloader:
         # Prediction

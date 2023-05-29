@@ -92,6 +92,9 @@ plt.tight_layout()
 plt.savefig(os.path.join(RESULTDIR, f"BCISpeedsBeforeLearning_seed{seed}_clda{clda}.png"))
 plt.close()
 
+# Save naive model
+torch.save(net.state_dict(), os.path.join(DATADIR, f"model_naive_seed{seed}.pth"))    # model parameters
+
 # Training under BCI control
 epochs = 2000
 lambda_ctrl = 0.

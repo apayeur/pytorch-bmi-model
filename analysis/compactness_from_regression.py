@@ -88,10 +88,10 @@ def convert_target_position_to_id(targets, nb_of_ids=8):
 
 n_seeds = 1
 seeds = list(range(1, 1+n_seeds))
-cldas = [0.0]  # [0.0, 0.1, 0.2, 0.5]
+cldas = [0.5]  # [0.0, 0.1, 0.2, 0.5]
 
 n_reals = 30  # number of realizations to use
-bin_width = 0.1
+bin_width = 0.2
 
 DIR = "bci-with-feedback-high-noise-cldastart0-cldastop100-cldafreq10-adam"
 BCI_DATADIR = os.path.join("../data/", DIR)
@@ -160,7 +160,7 @@ for clda in cldas:
                     Y_fold[sample_count] = T[r, t]
                     sample_count += 1
 
-            skfolds = StratifiedKFold(n_splits=2)
+            skfolds = StratifiedKFold(n_splits=3)
             for train_index, test_index in skfolds.split(X_fold, Y_fold):
                 # Single-unit ranking
                 scores = []
@@ -187,6 +187,7 @@ for clda in cldas:
                 print(np.array(scores)[ranked_units])
 
 
+
             # (could use reshape, but I don't trust data will all be correctly aligned)
             X = np.empty((n_reals*dataloader.batch_size, n_timebins//window_size * n_readouts))
             Y = np.empty(n_reals*dataloader.batch_size)
@@ -197,10 +198,6 @@ for clda in cldas:
 
 
             '''
-            ranked_units = np.argsort(test_loss)
-            single_unit_ranking[clda].append(ranked_units)
-            single_unit_ranking_losses[clda].append(np.sort(test_loss))
-
             # Compute ranked unit-adding curve
             test_loss = np.empty(n_readouts)
             net.readout_layer.weight.data = torch.zeros_like(D.data)
