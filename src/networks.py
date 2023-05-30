@@ -164,7 +164,7 @@ class NoisyNetWithFeedback(NoisyNet):
         self.delay = delay  # in time steps
         self.feedback_type = feedback_type
         self.distance = distance  # in meters, needed for proper normalization of position feedback
-        assert feedback_type in ['position_only', 'position_and_velocity']
+        assert feedback_type in ['position_only', 'position_and_velocity', 'full_state']
 
     def forward(self, x, v0):
         assert x.dim() == 3, f"RNN: Expected input to be 3-D but received {x.dim()}-D tensor"
@@ -191,7 +191,11 @@ class NoisyNetWithFeedback(NoisyNet):
         elif self.feedback_type == 'position_and_velocity':
             feedback_buffer = [torch.cat((effector_initial_state[:, :self.effector.workspace_dim] / self.distance,
                                           effector_initial_state[:, self.effector.workspace_dim:2*self.effector.workspace_dim]), -1)] * (int(self.delay) + 1)
-
+        elif self.feedback_type == 'full_state':
+            feedback_buffer = [torch.cat((effector_initial_state[:, :self.effector.workspace_dim] / self.distance,
+                                          effector_initial_state[:,
+                                          self.effector.workspace_dim:]), -1)] * (
+                                          int(self.delay) + 1)
         # Integrate
         v = v0
         s = effector_initial_state
@@ -216,7 +220,10 @@ class NoisyNetWithFeedback(NoisyNet):
             elif self.feedback_type == 'position_and_velocity':
                 feedback_buffer.append(torch.cat((s[:, :self.effector.workspace_dim] / self.distance,
                                                   s[:, self.effector.workspace_dim:2*self.effector.workspace_dim]), -1))
-
+            elif self.feedback_type == 'full_state':
+                feedback_buffer.append(torch.cat((s[:, :self.effector.workspace_dim] / self.distance,
+                                                  s[:, self.effector.workspace_dim:]),
+                                                 -1))
         return effector_states, h, controls
 
 
