@@ -9,7 +9,7 @@ def build_bci_decoder(net, dataloader, noisy_ics, n_readouts=10, hold=0, clda=0.
     dynamics_before_clda = None
     with torch.no_grad():
         for X, y in dataloader:
-            h0 = noisy_ics * torch.randn(
+            h0 = noisy_ics * torch.rand(
                 (1, dataloader.batch_size, net.network_size[2]))  # set of initial conditions for motor cortex
             dyn, h, _ = net(X, h0)
             dynamics_before_clda = copy.deepcopy(dyn)

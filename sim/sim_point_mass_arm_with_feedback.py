@@ -27,10 +27,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--n_targets", type=int, help="number of targets", default=8)
 parser.add_argument("--dt", type=float, help="integration time step", default=0.01)
 parser.add_argument("--total_duration", type=float, help="total duration of the reach, including holding times", default=1.)
-parser.add_argument("--sigma", type=float, help="single-unit noise intensity", default=0.005)
+parser.add_argument("--sigma", type=float, help="single-unit noise intensity", default=0.02)
 parser.add_argument("--noisy_ics", type=float, help="noise intensity for RNN hidden layer initial condition", default=1.)
 parser.add_argument("--reset_radius", type=float, help="noise intensity for arm initial condition", default=0.005)
-parser.add_argument("--feedback_type", type=str, help="type of feedback, e.g. position_only", default='full_state')
+parser.add_argument("--feedback_type", type=str, help="type of feedback, e.g. position_only", default='position_only')
 parser.add_argument("--seed", type=int, help="seed", default=1)
 parser.add_argument("--nonlinearity", type=str, help="nonlinearity", default='relu')
 parser.add_argument("--gamma_v", type=float, help="hyperparameter for end-velocity loss", default=0.25)
@@ -39,7 +39,7 @@ parser.add_argument("--lambda_ctrl", type=float, help="hyperparameter for contro
 parser.add_argument("--lambda_rate", type=float, help="hyperparameter for rate loss", default=0.)
 parser.add_argument("--delay", type=int, help="hyperparameter for control loss", default=10)
 parser.add_argument("--lr", type=float, help="learning rate", default=5e-4)
-parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(10, 100, 100, 2))
+parser.add_argument("--size", type=tuple, help="size of the network (in, h1, h2, out)", default=(6, 100, 100, 2))
 args = parser.parse_args()
 
 
@@ -51,7 +51,7 @@ def plot_trajectories(net, dataset, outfile_name=None, n_reals=5):
         if n_reals > 1 and args.reset_radius > 0:
             for _ in range(n_reals):
                 for i in range(dataset.n_targets):
-                    pred, h, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.randn((1, 1, net.network_size[2])))
+                    pred, h, controls = net(dataset[i][0].unsqueeze(0), args.noisy_ics * torch.rand((1, 1, net.network_size[2])))
                     pred = pred.detach().numpy()
                     controls = controls.detach().numpy()
                     pred_traj = pred[0, :, :2]
@@ -101,8 +101,8 @@ def plot_loss(l, outfile_name=None):
 
 # ======================  MAIN CODE  ====================== #
 # Paths to save data and results
-DATADIR = "../data/point-mass-arm-with-feedback-full-state"
-RESULTDIR = "../results/point-mass-arm-with-feedback-full-state"
+DATADIR = "../data/point-mass-arm-with-feedback-delay10"
+RESULTDIR = "../results/point-mass-arm-with-feedback-delay10"
 if not os.path.exists(DATADIR):
     os.makedirs(DATADIR)
 if not os.path.exists(RESULTDIR):
@@ -134,13 +134,13 @@ loss_fn = EndLoss(args.gamma_v, args.gamma_f, args.lambda_ctrl, args.lambda_rate
 
 # Training
 optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-epochs = 5000
+epochs = int(1e4)
 plot_trajectories(net, dataset, os.path.join(RESULTDIR, f"ManualControlTrajectoriesBeforeLearning_seed{seed}.png"))
 losses = []
 for t in range(epochs):
     for X, y in dataloader:
         # Prediction
-        v0 = args.noisy_ics*torch.randn((1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
+        v0 = args.noisy_ics*torch.rand((1, args.n_targets, network_size[2]))  # set of initial conditions for motor cortex
         pred, h, controls = net(X, v0)
 
         # Loss
@@ -157,7 +157,7 @@ for t in range(epochs):
 
 with torch.no_grad():
     for X, y in dataloader:
-        pred, h, ctrls = net(X, args.noisy_ics * torch.randn((1, dataloader.batch_size, net.network_size[2])))
+        pred, h, ctrls = net(X, args.noisy_ics * torch.rand((1, dataloader.batch_size, net.network_size[2])))
         print(torch.max(h))
 
 # Plot some results

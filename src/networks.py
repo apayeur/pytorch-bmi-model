@@ -25,7 +25,7 @@ class NoisyRNN(nn.RNN):
     r"""
     Noisy RNN with decay. To replace native `nn.RNN` from Pytorch.
 
-    :math:`v_t = v_{t-1} + \\alpha (-v_{t-1} + Wf(v_{t-1}) + U x_t + b_h + b_i) + \sigma \sqrt{\\alpha} \xi_t`
+    :math:`v_t = v_{t-1} + \alpha (-v_{t-1} + Wf(v_{t-1}) + U x_t + b_h + b_i) + \sigma \sqrt{\alpha} \xi_t`
 
     where :math:`\xi_t` = standard Gaussian variate
     """
@@ -124,10 +124,10 @@ class SimpleNet(nn.Module):
         # -- Biases --
         if self.nonlinearity == 'relu':
             # Encoder
-            nn.init.uniform_(self.input_encoder.bias, a=0.5, b=1.5)
+            nn.init.uniform_(self.input_encoder.bias, a=0., b=1.)
             # Motor cortex
             nn.init.zeros_(self.motor_cortex.bias_ih_l0)  # bias from input layer to hidden
-            nn.init.uniform_(self.motor_cortex.bias_hh_l0, a=0.5, b=1.5)  # bias from hidden layer to hidden
+            nn.init.uniform_(self.motor_cortex.bias_hh_l0, a=0., b=1.)  # bias from hidden layer to hidden
         elif self.nonlinearity == 'tanh':
             # Encoder
             nn.init.zeros_(self.input_encoder.bias)

@@ -6,7 +6,7 @@ import os
 plt.style.use('../plot_params.dms')
 
 
-dir_name = "bci-with-feedback-velocity-cldastart0-cldastop100-cldafreq10-adam"
+dir_name = "bci-with-feedback-delay10-cldastart0-cldastopFalse-cldafreq100"
 cldas = [0.0, 0.1, 0.2, 0.5]
 n_seeds = 5
 list_of_losses = []
